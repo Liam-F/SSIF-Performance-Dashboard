@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Importing Asset Prices</title>
+</head>
+<body>
+{% if assetnames %}
+    About to import Asset Prices for the following stocks: {{assetnames}}
+    <br/>
+    Click <a href="./confirm/">here</a> to start
+{% elif log %}
+    {% for l in log %}
+        {{l}} <br/>
+    {% endfor %}
+{% endif %}
+</body>
+</html>
