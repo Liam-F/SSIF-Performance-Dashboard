@@ -35,5 +35,9 @@ def importPrices(startDate, endDate):
 
     return log
 
-def importAssets(csv):
-    print(pd.read_csv(csv))
+def importTransactions(csv):
+    t = pd.read_csv(csv)
+    if('ticker' in t.columns and 'shares' in t.columns):
+
+    else:
+        return {'error': 'Poorly formatted import, should be two columns: ticker and shares'}
