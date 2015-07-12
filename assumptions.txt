@@ -1,0 +1,6 @@
+The tradeoff between objective-focus and well-generalized, will result in creation of assumptions one way or another.
+As I develop this system, I will have to put in the assumptions the dashboard makes to cut code and save time.
+
+Assumptions
+1. Transactions are made on valid trading days
+2. From (1), the most recent available data is used to calculate portfolio value
