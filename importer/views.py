@@ -15,7 +15,7 @@ def index(request):
     return HttpResponse(template.render(context))
 
 def confirm(request):
-    startDate = datetime.date(2014,1,1)
+    startDate = datetime.date(2013,12,1)
     endDate = datetime.date(2015,7,1)
     outputlog = importPrices(startDate, endDate)
 

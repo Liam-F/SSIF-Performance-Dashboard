@@ -1,4 +1,4 @@
-from data.models import Asset, AssetPrice
+from data.models import Asset, AssetPrice, Transaction
 import pandas as pd
 import urllib.parse as parser
 import datetime as dt
@@ -37,7 +37,12 @@ def importPrices(startDate, endDate):
 
 def importTransactions(csv):
     t = pd.read_csv(csv)
-    if('ticker' in t.columns and 'shares' in t.columns):
-
+    dateformat = '%m/%d/%Y'
+    if(set(['ticker', 'date', 'shares']).issubset(t.columns)):
+         for i,row in t.iterrows():
+             a = Asset.objects.filter(ticker__exact= row['ticker'])[0]
+             trans = Transaction(assetid = a, date = dt.datetime.strptime(row['date'], dateformat), shares = row['shares'])
+             print('Saving: '+str(trans))
+             trans.save()
     else:
-        return {'error': 'Poorly formatted import, should be two columns: ticker and shares'}
+        return {'error': 'Poorly formatted import, should be three columns: ticker, date and shares'}

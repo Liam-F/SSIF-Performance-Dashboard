@@ -7,13 +7,11 @@ import csv
 import django
 django.setup()
 
-p = d.Portfolio()
-print(p.calculatePortfolioValue(datetime.datetime(2014,6,30)))
-pv = p.calculatePortfolioTimeSeries()
-
+#im.importTransactions('transactions-jan1.csv')
+#d.Portfolio().generatePortfolioTimeSeries()
+d.Portfolio().exportPortfolioTimeSeries()
 #with open('a.csv', 'w') as csvf:
 #    writer = csv.DictWriter(csvf, fieldnames=['date','value'])
 #    writer.writeheader()
-#    for v in pv:
-#        writer.writerow(v)
-#im.importPrices(datetime.date(2014,1,1), datetime.date(2015,7,1))
+#    writer.writerow({'date': 'a', 'value': 'b'})
+#    writer.writerow({'date': 'a', 'value': 'b'})
