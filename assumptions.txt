@@ -4,3 +4,5 @@ As I develop this system, I will have to put in the assumptions the dashboard ma
 Assumptions
 1. Transactions are made on valid trading days
 2. From (1), the most recent available data is used to calculate portfolio value
+3. Only One dividend may be distributed on a pay date for each asset
+4. Only the first stock's price time-series is used to calculate portfolio value, certain dates may be skipped out but currently, a liquid stock is being used (AAPL)
