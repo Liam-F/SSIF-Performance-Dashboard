@@ -27,9 +27,20 @@ class Asset(models.Model):
 
         if not p or not s: # If no price is available
             return 0
-        else: # Total Shares * Price
-            return s*p[0].price
 
+        return s*p[0].price*self.getExchangeRate(ddate)
+
+    def getExchangeRate(self, ddate):
+        # get the current exchange rate as of this date OR next available date
+        # ASSUMPTION : USDCAD ONLY ATM, PORTFOLIO IS CAD DENOMINATED
+        if self.country == 'US':
+            exa = Asset.objects.filter(name__exact='USDCAD')[0]
+            exc = AssetPrice.objects.filter(date__lte=ddate, assetid__exact=exa.assetid).order_by('-date')
+            if not exc:
+                return exc[0].price
+            else: return 1; # Fuck usd bulls, parity plz
+        else:
+            return 1;
 class AssetPrice(models.Model):
     assetid = models.ForeignKey(Asset, unique_for_date='date')
     date = models.DateTimeField()
@@ -84,13 +95,14 @@ class Portfolio(models.Model):
 
         for a in Asset.objects.all():
            self.value += a.calculateHoldingValue(ddate)
+           exc = a.getExchangeRate(ddate) # get Exchange Rate to CAD
 
            # Calculate Dividends on this date
            aggTrans = a.aggregateAssetTransactions(ddate)
            # ASSUMPTION: Only One dividend may be distributed that dividend day for each asset
            d = AssetDividend.objects.filter(date__exact=ddate, assetid__exact=a.assetid)
            if d:
-            self.cash += aggTrans*d[0].dps
+            self.cash += aggTrans*d[0].dps*exc
 
            # Reconcile Cash
            # Asset Price as of the transaction date OR later if no price data is available
@@ -100,7 +112,7 @@ class Portfolio(models.Model):
 
            # ASSUMPTION: Transactions must be made on a valid trading date or cash will not be deducted
            for tr in Transaction.objects.filter(date__exact = ddate, assetid__exact = a.assetid):
-               self.cash -= tr.shares*p[0].price # Subtracted because negative shares = increase in cash and vice versa
+               self.cash -= tr.shares*p[0].price*exc # Subtracted because negative shares = increase in cash and vice versa
 
         return self.value+self.cash
 
