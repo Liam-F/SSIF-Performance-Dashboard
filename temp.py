@@ -11,21 +11,19 @@ django.setup()
 #for ll in l: print(ll)
 #im.importTransactions('transactions-2015.csv')
 e = d.Portfolio(cash=776980)
-#e.generatePortfolioTimeSeries()
-#e.exportPortfolioTimeSeries()
-a = e.calculatePortfolioValue(dt.datetime(2015,1,3))
-print(a)
-a = e.calculatePortfolioValue(dt.datetime(2015,5,22))
-print(a)
-#with open('usdcad.csv', 'rt') as csvf:
+e.generatePortfolioTimeSeries()
+e.exportPortfolioTimeSeries()
+
+
+#with open('xls.csv', 'rt') as csvf:
 #    read = csv.DictReader(csvf, fieldnames=['Date', 'Last Price'])
 #    next(read)
-
 #    for r in read:
-#        aa = d.Asset.objects.filter(assetid__exact=28)[0]
-#        a = d.AssetPrice(assetid=aa, date = dt.datetime.strptime(r['Date'], '%m/%d/%Y'), price=r['Last Price'])
-#        print('Saving '+a.__str__())
-#        a.save()
+#       aa = d.Asset.objects.filter(assetid__exact=29)[0]
+#       a = d.AssetPrice(assetid=aa, date = dt.datetime.strptime(r['Date'], '%m/%d/%Y'), price=r['Last Price'])
+#       print('Saving '+a.__str__())
+#       a.save()
+
 #with open('a.csv', 'w') as csvf:
 #    writer = csv.DictWriter(csvf, fieldnames=['date','value'])
 #    writer.writeheader()

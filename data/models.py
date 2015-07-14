@@ -127,7 +127,7 @@ class Portfolio(models.Model):
         for d in dates:
             p = Portfolio(date=d, cash=self.cash, value=self.value)
             val = p.calculatePortfolioValue(d)
-            print('Saving Portfolio on '+d.strftime('%Y-%m-%d')+' Equity Value: $'+p.value+' Cash: $'+str(p.cash)+' Portfolio Value: $'+str(val))
+            print('Saving Portfolio on '+d.strftime('%Y-%m-%d')+' Equity Value: $'+str(p.value)+' Cash: $'+str(p.cash)+' Portfolio Value: $'+str(val))
             p.save()
 
         return 1
