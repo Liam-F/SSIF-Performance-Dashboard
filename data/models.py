@@ -23,12 +23,16 @@ class Asset(models.Model):
         s = self.aggregateAssetTransactions(ddate)
 
         # get the current price as of this date OR the next available day
+        p = self.getAssetPrice(ddate)
+
+        return s*p*self.getExchangeRate(ddate)
+
+    def getAssetPrice(self, ddate):
         p = AssetPrice.objects.filter(date__lte=ddate, assetid__exact=self.assetid).order_by('-date')
-
-        if not p or not s: # If no price is available
+        if not p:
             return 0
-
-        return s*p[0].price*self.getExchangeRate(ddate)
+        else:
+            return p[0].price
 
     def getExchangeRate(self, ddate):
         # get the current exchange rate as of this date OR next available date
@@ -37,10 +41,11 @@ class Asset(models.Model):
             exa = Asset.objects.filter(name__exact='USDCAD')[0]
             exc = AssetPrice.objects.filter(date__lte=ddate, assetid__exact=exa.assetid).order_by('-date')
             if not exc:
-                return exc[0].price
-            else: return 1; # Fuck usd bulls, parity plz
-        else:
+                return 1 # Fuck usd bulls, parity plz
+            else: return exc[0].price;
+        else: # add more cur
             return 1;
+
 class AssetPrice(models.Model):
     assetid = models.ForeignKey(Asset, unique_for_date='date')
     date = models.DateTimeField()
@@ -106,13 +111,11 @@ class Portfolio(models.Model):
 
            # Reconcile Cash
            # Asset Price as of the transaction date OR later if no price data is available
-           p = AssetPrice.objects.filter(date__lte=ddate, assetid__exact=a.assetid).order_by('-date')
-           if not p:
-               p = 0
+           p = a.getAssetPrice(ddate)
 
            # ASSUMPTION: Transactions must be made on a valid trading date or cash will not be deducted
            for tr in Transaction.objects.filter(date__exact = ddate, assetid__exact = a.assetid):
-               self.cash -= tr.shares*p[0].price*exc # Subtracted because negative shares = increase in cash and vice versa
+               self.cash -= tr.shares*p*exc # Subtracted because negative shares = increase in cash and vice versa
 
         return self.value+self.cash
 
@@ -124,13 +127,13 @@ class Portfolio(models.Model):
         for d in dates:
             p = Portfolio(date=d, cash=self.cash, value=self.value)
             val = p.calculatePortfolioValue(d)
-            print('Saving Portfolio on '+d.strftime('%Y-%m-%d')+' Portfolio Value: $'+str(val)+' Cash: $'+str(p.cash))
+            print('Saving Portfolio on '+d.strftime('%Y-%m-%d')+' Equity Value: $'+p.value+' Cash: $'+str(p.cash)+' Portfolio Value: $'+str(val))
             p.save()
 
         return 1
 
     def __str__(self):
-        return 'Portfolio on '+self.date.strftime('%Y-%m-%d')+' Portfolio Value: $'+str(self.value)+' Cash: $'+str(self.cash)
+        return 'Portfolio on '+self.date.strftime('%Y-%m-%d')+' Equity Value: $'+str(self.value)+' Cash: $'+str(self.cash)
 
     def exportPortfolioTimeSeries(self):
         port = Portfolio.objects.all().order_by('date')

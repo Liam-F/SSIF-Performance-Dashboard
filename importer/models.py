@@ -5,6 +5,8 @@ import datetime as dt
 
 #https://code.google.com/p/yahoo-finance-managed/wiki/csvHistQuotesDownload
 def importPrices(startDate, endDate):
+
+    exclusion_list = ['USDCAD=X']
     log = []
     alist = Asset.objects.all()
     log.append('Getting prices '+startDate.strftime('%d-%m-%Y')+' - '
@@ -13,6 +15,9 @@ def importPrices(startDate, endDate):
     log.append('')
 
     for i,a in enumerate(alist):
+        if a.ticker in exclusion_list:
+            continue
+
         payload = {
             's': a.ticker, # Ticker Name
             'a': startDate.month-1,'b': startDate.day, 'c': startDate.year,#Start Date MM DD YYYY , MINUS MONTH BY 1
