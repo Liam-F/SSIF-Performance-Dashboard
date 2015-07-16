@@ -4,22 +4,79 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Sprott Student Investment Fund | Performance</title>
+    <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
-    <!-- Theme -->
-    <link href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.5/lumen/bootstrap.min.css" rel="stylesheet">
+    <script src="http://code.highcharts.com/stock/highstock.js"></script>
+    <script src="http://code.highcharts.com/stock/modules/exporting.js"></script>
+    <link href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.5/journal/bootstrap.min.css" rel="stylesheet">
     {% load staticfiles %}
     <link href="{% static 'dashboard/styles.css' %}" rel="stylesheet">
+
+    <!-- Main Portfolio Chart -->
+    <script type="text/javascript">
+    $(function () {
+
+        $.getJSON('/portfoliojson', function (data) {
+            // Create the chart
+            $('#portfolio').highcharts('StockChart', {
+                chart:{backgroundColor:null},
+                rangeSelector : {selected : 5},
+                title : {text : ''},
+                tooltip: {pointFormat: '<span style="color:{point.color}">\u25CF</span> {series.name}: <b>${point.y}</b><br/>'},
+                yAxis: {gridLineDashStyle: 'dot'},
+                xAxis: {
+                    gridLineDashStyle: 'dot',
+                    gridLineWidth: 1
+                },
+                series : [{
+                    name : 'Fund Value',
+                    data : data,
+                    tooltip: {
+                        valueDecimals: 2
+                    }
+                }]
+            });
+        });
+
+    });
+    </script>
 </head>
 <body>
-    <div class="container">
-        <nav class="navbar navbar-default">
-            <div class="navbar-header">
-                <a class="navbar-brand" href="#">
-                    <img alt="SSIF Logo" src="{% static 'dashboard/logo.jpg' %}" />
-                </a>
+    <div class="pattern"> </div>
+    <nav class="navbar navbar-default">
+        <div class="container">
+            <div class="col-md-1 logo">
+                <img src="{% static 'dashboard/logo.png' %}" />
             </div>
-        </nav>
+            <div class="col-md-4 col-md-offset-7 zeropad">
+                <h5><a href="#">About</a></h5>
+                <h5><a href="#">SSIF Home Page</a></h5>
+            </div>
+        </div>
+    </nav>
+    <div class="container">
+
+        <div class="col-md-12 zeropad">
+            <div class="panel panel-default">
+                <div class="panel-heading">Quick Fund Overview</div>
+                <div class="panel-body">
+                    <div class="col-md-2 overview">Mean Annual Return<br/> {{ avgRet }}%</div>
+                    <div class="col-md-2 overview">Annualized Volatility<br/> {{ vola }}%</div>
+                    <div class="col-md-2 overview">Sharpe Ratio<br/> {{ sharpe }}</div>
+                    <div class="col-md-2 overview">Information Ratio<br/> 1.25</div>
+                    <div class="col-md-2 overview">Annualized Alpha<br/> {{ alpha }}%</div>
+                    <div class="col-md-2 overview last">Benchmark Beta<br/> {{ beta }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12 zeropad">
+            <h3>Fund Performance</h3>
+            From {{ portfolioStartDate }} to Present
+            <div class="well">
+                <div id="portfolio" style="height: 350px;"></div>
+            </div>
+        </div>
     </div>
 </body>
 </html>

@@ -34,6 +34,21 @@ class Asset(models.Model):
         else:
             return p[0].price
 
+    def getReturns(self, sDate = None, eDate = None):
+        if sDate is None:
+            sDate = AssetPrice.objects.filter(assetid__exact = self.assetid).order_by('date')[0].date
+        if eDate is None:
+            eDate = AssetPrice.objects.filter(assetid__exact = self.assetid).order_by('-date')[0].date
+
+        p = AssetPrice.objects.filter(assetid__exact = self.assetid, date__gte = sDate, date__lte = eDate).order_by('-date')
+        r = []
+        dates = []
+        for i in range(0,len(p)-1):
+            r.append((p[i].price)/(p[i+1].price) -1)
+            dates.append(p[i+1].date) # Return = % Change as of Yesterday close to Today's close
+
+        return { 'date': dates, 'return': r}
+
     def getExchangeRate(self, ddate):
         # get the current exchange rate as of this date OR next available date
         # ASSUMPTION : USDCAD ONLY ATM, PORTFOLIO IS CAD DENOMINATED
@@ -49,7 +64,7 @@ class Asset(models.Model):
 class AssetPrice(models.Model):
     assetid = models.ForeignKey(Asset, unique_for_date='date')
     date = models.DateTimeField()
-    price = models.DecimalField(max_digits=10,decimal_places=2)
+    price = models.FloatField()
 
     def __str__(self):
         return 'Name: '+str(self.assetid.name)+' | Date: '+self.date.strftime('%Y-%m-%d')+' | '+str(self.price)
@@ -57,7 +72,7 @@ class AssetPrice(models.Model):
 class AssetDividend(models.Model):
     assetid = models.ForeignKey(Asset, unique_for_date='date')
     date = models.DateTimeField()
-    dps = models.DecimalField(max_digits=5,decimal_places=2)
+    dps = models.FloatField()
 
     def __str__(self):
         return 'Name: '+str(self.assetid.name)+' | Date: '+self.date.strftime('%Y-%m-%d')+' | DPS: '+str(self.dps)
@@ -65,7 +80,7 @@ class AssetDividend(models.Model):
 class Transaction(models.Model):
     transid = models.AutoField(primary_key=True)
     date = models.DateTimeField()
-    shares = models.DecimalField(max_digits=10, decimal_places=3)
+    shares = models.FloatField()
     assetid = models.ForeignKey(Asset)
 
     def __str__(self):
@@ -80,8 +95,8 @@ class Transaction(models.Model):
 class Portfolio(models.Model):
     portfolioid = models.AutoField(primary_key=True)
     date = models.DateTimeField()
-    value = models.DecimalField(max_digits=10, decimal_places=3, default=0, unique_for_date='date')
-    cash = models.DecimalField(max_digits=10, decimal_places=3, default=1000000, unique_for_date='date') #Set default as initial Cash!!
+    value = models.FloatField(unique_for_date='date')
+    cash = models.FloatField(unique_for_date='date') #Set default as initial Cash!!
 
     def calculatePortfolioValue(self, ddate):
         # If portfolio exists on today, delete it
@@ -142,5 +157,22 @@ class Portfolio(models.Model):
             w.writeheader()
             for p in port:
                 w.writerow({'date': p.date, 'portfolio value': p.value, 'cash': p.cash})
+
+    def getPortfolioValue(self):
+        return self.value+self.cash
+
+    def getReturns(self, sDate = None, eDate = None):
+        if sDate is None:
+            sDate = Portfolio.objects.all().order_by('date')[0].date
+        if eDate is None:
+            eDate = Portfolio.objects.all().order_by('-date')[0].date
+
+        p = Portfolio.objects.filter(date__gte = sDate, date__lte = eDate).order_by('-date')
+        r = []
+        dates = []
+        for i in range(0,len(p)-1):
+            r.append((p[i].getPortfolioValue())/(p[i+1].getPortfolioValue()) -1)
+            dates.append(p[i+1].date)
+        return {'date': dates, 'return': r}
 
 

@@ -7,3 +7,5 @@ Assumptions
 3. Only One dividend may be distributed on a pay date for each asset
 4. Only the first stock's price time-series is used to calculate portfolio value, certain dates may be skipped out but currently, a liquid stock is being used (AAPL)
 5. Base Portfolio Currency CAD
+6. Only two benchmarks are used and need to be manually tweaked for additional benchmark mixing
+7. Portfolio Statistics and information are all calculated using daily intervals
