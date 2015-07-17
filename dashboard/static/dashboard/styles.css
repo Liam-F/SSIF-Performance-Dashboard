@@ -11,6 +11,14 @@
     height: 10px;
 }
 
+.deepblue{
+    color: #386898 !important;
+}
+
+.lightblue {
+    color: #96C0E6;
+}
+
 .overview{
     text-align:center;
     border-right: #eeeeee 1px solid;
@@ -23,13 +31,8 @@ h5{
     margin: 18px;
 }
 
-.panel-heading {
-    color: #96C0E6 !important;
-}
-
 h3{
     margin: 0;
-    color: #96C0E6;
 }
 
 a { color: #96C0E6; }
@@ -37,6 +40,14 @@ a:hover { color: #386898;}
 
 .zeropad{
    padding:0;
+}
+
+.zero-left-pad {
+    padding-left: 0px;
+}
+
+.zero-right-pad {
+    padding-right: 0px;
 }
 
 .well{

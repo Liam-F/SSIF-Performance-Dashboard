@@ -6,6 +6,7 @@ import datetime as dt
 import json
 import pandas as pd
 import numpy as np
+import pdb;
 
 #since epoch milliseconds
 def unix_time(dte):
@@ -26,11 +27,15 @@ def index(request):
     # ASSUMPTION: Benchmark is hardcoded as 65% US SPX, 35% CN TSX
     w = [0.65, 0.35]
     benchmark = Asset.objects.filter(industry__exact = 'Index')
-    # get returns according to available portfolio dates
-    rmat = pd.merge(pd.DataFrame(benchmark[0].getReturns()), pd.DataFrame(benchmark[1].getReturns()), on='date')
-    rmat = pd.merge(pd.DataFrame(r_p), rmat, on='date')
+    exr = Asset.objects.filter(name__exact = 'USDCAD')
+    # get returns according to available portfolio dates, merge is required to ensure dates are matched
+    # COLUMNS ARE: [DATE PORTFOLIO BENCHMARK US BENCHMARK CN USDCAD]
+    rmat = pd.merge(pd.DataFrame(benchmark[0].getReturns()), pd.DataFrame(benchmark[1].getReturns()), on='date') # Merge Benchmarks
+    rmat = pd.merge(pd.DataFrame(r_p), rmat, on='date') # Merge Portfolio Returns
+    rmat = pd.merge(rmat, pd.DataFrame(exr[0].getReturns()), on='date') # Merge Exchange Rates
     rmat = rmat.iloc[:,1:] # Remove Date column
-    r_b = np.dot(rmat.iloc[:, 1:], w) # Calculate Benchmark
+    rmat.iloc[:,1] *= (1+rmat.iloc[:,-1]) # USDCAD
+    r_b = np.dot(rmat.iloc[:, [1,2]], w) # Calculate Benchmark
     r = rmat.iloc[:, 0]
     beta = np.cov(r,r_b)[0,1]/np.var(r_b) # Beta
     alpha = (np.mean(r) - np.mean(r_b)*beta)*100*252

@@ -59,8 +59,16 @@
 
         <div class="col-md-12 zeropad">
             <div class="panel panel-default">
-                <div class="panel-heading">Quick Fund Overview</div>
+                <div class="panel-heading deepblue"> Fund Overview</div>
                 <div class="panel-body">
+                    <div class="col-md-12" style="margin-bottom: 25px; text-align:justify;">
+                        <span class="deepblue"><b>The Sprott Student Investment Fund’s</b></span> equity portfolio takes a fundamental approach to investing with a
+                        value orientation; seeking to maximize the value of its assets over the very long term. The primary
+                        focus is on building a portfolio of wealth creating firms, with unique competitive advantages, strong
+                        financial positions, and proven management teams. We strive to make these investments only in firms that
+                        trade at discounts to their intrinsic value.
+                    </div>
+                    <h5 class="col-md-12 zeropad deepblue" style="margin: 0 0 15px 0; text-align:center;">Performance Statistics</h5>
                     <div class="col-md-2 overview">Mean Annual Return<br/> {{ avgRet }}%</div>
                     <div class="col-md-2 overview">Annualized Volatility<br/> {{ vola }}%</div>
                     <div class="col-md-2 overview">Sharpe Ratio<br/> {{ sharpe }}</div>
@@ -71,10 +79,22 @@
             </div>
         </div>
         <div class="col-md-12 zeropad">
-            <h3>Fund Performance</h3>
-            From {{ portfolioStartDate }} to Present
+            <h3 class="deepblue"><span class="glyphicon glyphicon-stats" aria-hidden="true"></span> Fund Performance</h3>
+            <span class="lightblue">From {{ portfolioStartDate }} to Present</span>
             <div class="well">
                 <div id="portfolio" style="height: 350px;"></div>
+            </div>
+        </div>
+        <div class="col-md-6 zero-left-pad">
+            <h3 class="deepblue"><span class="glyphicon glyphicon-tasks" aria-hidden="true"></span> Sector Allocation</h3>
+            <div class="well">
+
+            </div>
+        </div>
+        <div class="col-md-6 zero-right-pad">
+            <h3 class="deepblue"><span class="glyphicon glyphicon-fire" aria-hidden="true"></span> Top Picks</h3>
+            <div class="well">
+
             </div>
         </div>
     </div>
