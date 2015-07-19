@@ -9,3 +9,6 @@ Assumptions
 5. Base Portfolio Currency CAD
 6. Only two benchmarks are used and need to be manually tweaked for additional benchmark mixing
 7. Portfolio Statistics and information are all calculated using daily intervals
+8. Return calculated on Current holdings is equal to Sum{Today's value} + Sum{Sell-off Value} / Sum{Total Cost} - 1.
+9. (8) implies all stocks use to be held count as no return
+10. Sparklines start at portfolio start date

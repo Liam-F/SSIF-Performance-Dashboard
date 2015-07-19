@@ -7,7 +7,8 @@ import json
 import pandas as pd
 import numpy as np
 import pdb
-#from scipy import optimize
+from os.path import isfile
+from scipy import optimize
 
 #since epoch milliseconds
 def unix_time(dte):
@@ -41,6 +42,40 @@ def index(request):
     beta = np.cov(r,r_b)[0,1]/np.var(r_b) # Beta
     alpha = (np.mean(r) - np.mean(r_b)*beta)*100*252
 
+    # Holdings List:
+    holdings = []
+    assetids =[]
+    for a in Asset.objects.all():
+        assetValNow = a.calculateHoldingValue(ddate = dt.datetime.now())
+        if(assetValNow > 0):
+            # Get Total Return
+            # ASSUMPTION: Completely sold off assets are excluded
+            assetValCost = 0.0
+            for s in Transaction.objects.filter(assetid__exact = a):
+                cost = s.getCost()
+                if(cost < 0):
+                    assetValNow -= cost # it's negative cost so add it to the value now
+                else:
+                    assetValCost += cost
+
+            # Get Managers
+            m = SectorManager.objects.filter(assetid__exact = a)
+            if not m: m = 'None'
+            else: m = m[0].name
+
+            # Get Dividend Yield
+            divValue = a.aggregateDividends()
+            dyield = divValue / assetValNow
+
+            assetids.append(a.assetid) # For Sparklines
+            holdings.append({'assetid': a.assetid,
+                             'ticker': a.ticker,
+                             'company': a.name,
+                             'sector': a.industry,
+                             'country': a.country,
+                             'totalreturn': round((assetValNow/assetValCost - 1)*100, 1),
+                             'manager': m,
+                             'yield': round(dyield*100,1)})
 
     # Template and output
     template = loader.get_template('dashboard/index.html')
@@ -50,7 +85,9 @@ def index(request):
         'vola': round(sigma, 2),
         'sharpe': round(sharpe,2),
         'alpha': round(alpha, 2),
-        'beta': round(beta,2)
+        'beta': round(beta,2),
+        'holdings': holdings,
+        'assetids': assetids
     })
 
     return HttpResponse(template.render(context))
@@ -90,31 +127,108 @@ def allocationjson(request):
     return JsonResponse(temp, safe=False)
 
 def frontierjson(request):
-    exclusion_list = ['USDCAD=X', '^GSPTSE', '^GSPC', 'XLS'] #Excelis is missing data
+    if(isfile('frontier.json')):
+        with open('frontier.json') as j:
+            r_r = json.load(j)
+            return JsonResponse(r_r, safe=False)
+    else:
+        exclusion_list = ['USDCAD=X', '^GSPTSE', '^GSPC', 'XLS'] #Excelis is missing data
 
-    # Markowitz Frontier
-    r = pd.DataFrame(Asset.objects.all().first().getReturns()) # get the first asset to start it
-    for a in Asset.objects.all()[1:]:
-        if a.ticker not in exclusion_list:
-            r = r.merge(pd.DataFrame(a.getReturns()), on='date')
-    r = r[:, 1:] # Remove date column
+        # Markowitz Frontier
+        sDate = Portfolio.objects.all().order_by('date')[0].date # Get first date of Portfolio
+        r = pd.DataFrame(Asset.objects.all().first().getReturns(sDate = sDate, eDate = dt.datetime.now())) # get the first asset to start it
+        for a in Asset.objects.all()[1:]:
+            if a.ticker not in exclusion_list:
+                r = r.merge(pd.DataFrame(a.getReturns(sDate = sDate, eDate = dt.datetime.now())), on='date')
+        r = r.iloc[:, 1:] # Remove date column
 
-    # First calculate Min variance
-    n = r.columns
-    covar = r.cov()
-    er = r.mean(axis=1)
-    cons = ({'type': 'eq', 'fun': lambda x: 1-sum(x)},)
-   # w = optimize.minimize(lambda x, covar: np.dot(x,np.dot(covar,x)),
-   #                       x0=np.array([1.0/n]*n), #Initial guess of 1/N
-   #                       args=(covar), # Pass in arguments
-   #                       method='SLSQP', jac=False, #Jacobian vector
-    #                      constraints=cons, # constraints set as above
-    #                      options=({'maxiter': 1e4}))   #Ensure convergence
-   # r_r = [np.sqrt(w.fun), np.dot(w.x, er)]
+        # First calculate Min variance
+        n = len(r.columns)
+        covar = r.cov()
+        er = r.mean(axis=0)
+        cons = ({'type': 'eq', 'fun': lambda x: 1-sum(x)},{'type': 'ineq', 'fun': lambda x: x},)
+        wstar = optimize.minimize(lambda x, covar: np.sqrt(252*np.dot(x,np.dot(covar,x)))*100,
+                              x0=np.array([1.0/n]*n),#Initial guess of 1/N
+                              args=(covar), # Pass in arguments
+                              method='SLSQP', jac=False, #Jacobian vector
+                              constraints=cons, # constraints set as above
+                              options=({'maxiter': 1e5}))   #Ensure convergence
+        r_r = [{'x': wstar.fun, 'y': np.dot(wstar.x, er)*252*100}]
 
-    # Loop
-    eps = 0.001 # margin of increase in risk
-    n = 50 # number of iterations
+        # Loop
+        eps = 0.35 # margin of increase in risk
+        iter = 25 # number of iterations
+        vol = wstar.fun
+        for i in range(1,iter):
+            vol += eps
+            cons = ({'type': 'eq', 'fun': lambda x: 1-sum(x)},
+                    {'type': 'ineq', 'fun': lambda x: x},
+                    {'type': 'eq', 'fun': lambda x,covar: vol - np.sqrt(252*np.dot(x,np.dot(covar,x)))*100, 'args': (covar,)})
+            wstar = optimize.minimize(lambda x, er: -np.dot(x,er),
+                                      x0=np.array([1.0/n]*n),#Initial guess of 1/N
+                                      args=(er), # Pass in arguments
+                                      method='SLSQP', jac=False, #Jacobian vector
+                                      constraints=cons, # constraints set as above
+                                      options=({'maxiter': 1e5}))   #Ensure convergence
+            r_r.append({'x': np.sqrt(252*np.dot(wstar.x,np.dot(covar,wstar.x)))*100,
+                         'y': -wstar.fun*252*100})
 
+        # Save as JSON
+        with open('frontier.json', 'w') as j:
+            json.dump(r_r, j)
 
-    return JsonResponse(r, safe=False)
+    return JsonResponse(r_r, safe=False)
+
+def relativefrontjson(request):
+    # Calculate Portfolio Statistics
+    rf = 0.0 #LOL RATES
+    r_p = Portfolio().getReturns()
+    sDate = r_p['date'][-1]
+    r = r_p['return']
+    er = np.mean(r)*252*100 # Mean Annualized Return from daily
+    sigma = (np.std(r)*np.sqrt(252))*100 # Annualized Standard Deviation
+
+    # Calculate Benchmark Statistics
+    b = Asset.objects.filter(industry__exact = 'Index')
+    r_r = [{'x': sigma, 'y': er, 'name': 'SSIF'}]
+    r_ba = []
+    for bmark in b:
+        bp = bmark.getReturns(sDate = sDate, eDate = dt.datetime.now())
+        r_b = bp['return']
+        r_ba.append(pd.DataFrame(bp))
+        er = np.mean(r_b)*252*100 # Mean Annualized Return from daily
+        sigma = (np.std(r_b)*np.sqrt(252))*100 # Annualized Standard Deviation
+        r_r.append({'x': sigma, 'y': er, 'name': bmark.name})
+
+    # Calculate Combined Benchmark Statistics
+    # Assumption: 65% US and 35% CN like in main page, S&P 500 FIRST!
+    w = [0.65, 0.35]
+    r_ba = pd.DataFrame.merge(r_ba[0], r_ba[1], on='date').iloc[:,1:] # Strip the date
+    r_cb = np.dot(r_ba, w)
+    er = np.mean(r_cb)*252*100 # Mean Annualized Return from daily
+    sigma = (np.std(r_cb)*np.sqrt(252))*100 # Annualized Standard Deviation
+    r_r.append({'x': sigma, 'y': er, 'name': 'Combined Benchmark'})
+
+    return JsonResponse(r_r, safe=False)
+
+def spkperformancejson(request):
+    a = request.GET.get('a')
+    if a:
+        # Get Start Date of Portfolio
+        sDate = Portfolio.objects.all().order_by('date')[0].date
+        delta = dt.datetime.now() - sDate
+        pr = AssetPrice.objects.filter(assetid__exact = a, date__gte = sDate).order_by('date')
+        if not pr:
+            return HttpResponse('nah')
+
+        # If more than a month, we show weekly, else daily
+        if delta.days > 30:
+            pr = pr[0::5] # Weekly
+
+        resp = []
+        for p in pr:
+            resp.append({'x': unix_time(p.date), 'y': p.price})
+
+        return JsonResponse(resp, safe=False)
+    else:
+        return HttpResponse('nah')

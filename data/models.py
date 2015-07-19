@@ -18,6 +18,17 @@ class Asset(models.Model):
         s = Transaction.objects.filter(date__lte=ddate, assetid__exact=self.assetid).aggregate(Sum('shares'))
         return s['shares__sum'] or 0
 
+    # Function way too specific, consider deprecating or generalizing in the future
+    def aggregateDividends(self):
+        dps = 0
+        divs = AssetDividend.objects.filter(assetid__exact = self.assetid)
+        for d in divs:
+            shares = self.aggregateAssetTransactions(ddate = d.date)
+            if(shares > 0):
+                dps += d.dps*shares*self.getExchangeRate(ddate = d.date)
+
+        return dps
+
     def calculateHoldingValue(self, ddate):
         # Get a list of all transactional shares previous to this date
         s = self.aggregateAssetTransactions(ddate)
@@ -41,10 +52,13 @@ class Asset(models.Model):
             eDate = AssetPrice.objects.filter(assetid__exact = self.assetid).order_by('-date')[0].date
 
         p = AssetPrice.objects.filter(assetid__exact = self.assetid, date__gte = sDate, date__lte = eDate).order_by('-date')
+        exr = AssetPrice.objects.filter(assetid__exact = Asset.objects.filter(name__exact='USDCAD')[0], date__gte = sDate, date__lte = eDate).order_by('-date')
         r = []
         dates = []
         for i in range(0,len(p)-1):
-            r.append((p[i].price)/(p[i+1].price) -1)
+            rate_t = exr.filter(date__lte = p[i].date)[0].price
+            rate_t1 = exr.filter(date__lte = p[i+1].date)[0].price
+            r.append((p[i].price*rate_t)/(p[i+1].price*rate_t1) -1)
             dates.append(p[i+1].date) # Return = % Change as of Yesterday close to Today's close
 
         return { 'date': dates, 'return': r}
@@ -69,6 +83,14 @@ class AssetPrice(models.Model):
     def __str__(self):
         return 'Name: '+str(self.assetid.name)+' | Date: '+self.date.strftime('%Y-%m-%d')+' | '+str(self.price)
 
+class SectorManager(models.Model):
+    managerid = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=100)
+    assetid = models.ForeignKey(Asset)
+
+    def __str__(self):
+        return 'Name: '+str(self.name)+' | Responsible for: '+self.assetid.ticker
+
 class AssetDividend(models.Model):
     assetid = models.ForeignKey(Asset, unique_for_date='date')
     date = models.DateTimeField()
@@ -82,6 +104,12 @@ class Transaction(models.Model):
     date = models.DateTimeField()
     shares = models.FloatField()
     assetid = models.ForeignKey(Asset)
+
+    def getCost(self):
+        return (AssetPrice.objects.filter(date__lte = self.date, assetid__exact = self.assetid).order_by('-date')[0].price # Price that date or earlier
+                * self.shares # Number of shares
+                * self.assetid.getExchangeRate(ddate = self.date) # Account for Exchange rates (To CAD)
+                )
 
     def __str__(self):
         if(self.shares > 0):
