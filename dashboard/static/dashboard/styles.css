@@ -58,3 +58,7 @@ a:hover { color: #386898;}
 body {
     background: url('clean_textile.png');
 }
+
+.table>thead>tr>th, .table>tbody>tr>th, .table>tfoot>tr>th, .table>thead>tr>td, .table>tbody>tr>td, .table>tfoot>tr>td {
+    padding:2px;
+}

@@ -16,7 +16,7 @@ def index(request):
 
 def confirm(request):
     startDate = datetime.date(2015,1,1)
-    endDate = datetime.date(2015,7,13)
+    endDate = datetime.datetime.now()
     outputlog = importPrices(startDate, endDate)
 
     # Template and output
