@@ -1,1 +1,0 @@
-web: gunicorn ssif.wsgi --log-file -
