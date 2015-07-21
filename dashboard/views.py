@@ -41,6 +41,8 @@ def index(request):
     r = rmat.iloc[:, 0]
     beta = np.cov(r,r_b)[0,1]/np.var(r_b) # Beta
     alpha = (np.mean(r) - np.mean(r_b)*beta)*100*252
+    te = np.std(r-r_b)*100*np.sqrt(252)
+    ir = (er-rf)/te
 
     # Holdings List:
     holdings = []
@@ -86,6 +88,7 @@ def index(request):
         'sharpe': round(sharpe,2),
         'alpha': round(alpha, 2),
         'beta': round(beta,2),
+        'ir': round(ir,2),
         'holdings': holdings,
         'assetids': assetids
     })
@@ -214,17 +217,10 @@ def relativefrontjson(request):
 def spkperformancejson(request):
     a = request.GET.get('a')
     if a:
-        # Get Start Date of Portfolio
-        sDate = Portfolio.objects.all().order_by('date')[0].date
-        delta = dt.datetime.now() - sDate
-        pr = AssetPrice.objects.filter(assetid__exact = a, date__gte = sDate).order_by('date')
+        pr = AssetPrice.objects.filter(assetid__exact = a).order_by('-date')
         if not pr:
             return HttpResponse('nah')
-
-        # If more than a month, we show weekly, else daily
-        if delta.days > 30:
-            pr = pr[0::5] # Weekly
-
+        pr = pr[0:5]
         resp = []
         for p in pr:
             resp.append({'x': unix_time(p.date), 'y': p.price})

@@ -17,6 +17,9 @@
     <!-- Main Portfolio Chart -->
     <script type="text/javascript">
     $(function () {
+        $('[data-toggle="tooltip"]').tooltip({'container': 'body'});
+    });
+    $(function () {
 
         $.getJSON('/portfoliojson', function (data) {
             // Create the chart
@@ -171,6 +174,7 @@
                 },
                 plotOptions:{
                     series:{
+                        fillOpacity: 0.25,
                         lineWidth:1,
                         shadow:false,
                         states:{hover:{lineWidth:1}},
@@ -233,12 +237,15 @@
                         financial positions, and proven management teams. We strive to make these investments only in firms that
                         trade at discounts to their intrinsic value.
                     </div>
-                    <h5 class="col-md-12 zeropad deepblue" style="margin: 0 0 15px 0; text-align:center;">Performance Statistics</h5>
-                    <div class="col-md-2 overview">Mean Annual Return<br/> {{ avgRet }}%</div>
-                    <div class="col-md-2 overview">Annualized Volatility<br/> {{ vola }}%</div>
+                    <h5 class="col-md-12 zeropad deepblue" style="margin: 0 0 15px 0; text-align:center;">
+                        <span class="glyphicon glyphicon-info-sign" data-toggle="tooltip" data-placement="top" title="All Figures are annualized from daily data.  The SSIF Benchmark is calculated as 65% S&P 500 (US Equity) and 35% S&P TSX (CAN Equity)"></span>
+                        Performance Statistics
+                    </h5>
+                    <div class="col-md-2 overview">Mean Return<br/> {{ avgRet }}%</div>
+                    <div class="col-md-2 overview">Volatility<br/> {{ vola }}%</div>
                     <div class="col-md-2 overview">Sharpe Ratio<br/> {{ sharpe }}</div>
-                    <div class="col-md-2 overview">Information Ratio<br/> 1.25</div>
-                    <div class="col-md-2 overview">Annualized Alpha<br/> {{ alpha }}%</div>
+                    <div class="col-md-2 overview">Information Ratio<br/> {{ ir }}</div>
+                    <div class="col-md-2 overview">Alpha<br/> {{ alpha }}%</div>
                     <div class="col-md-2 overview last">Benchmark Beta<br/> {{ beta }}</div>
                 </div>
             </div>
@@ -270,24 +277,24 @@
                         <tr class="deepblue">
                             <th>Ticker</th>
                             <th>Company</th>
-                            <th>Performance</th>
                             <th>Sector</th>
                             <th>Country</th>
                             <th>Manager</th>
-                            <th>Return</th>
-                            <th>Yield</th>
+                            <th>5D Prices</th>
+                            <th><center>Return</center></th>
+                            <th><center>Yield</center></th>
                         </tr>
                       </thead>
                       <tbody>
                         {% for h in holdings %}
                             <tr>
-                                <td>{{h.ticker}}</td>
-                                <td>{{h.company}}</td>
-                                <td><div id="spk_{{h.assetid}}" style="height:25px; width:150px;"></div></td>
-                                <td>{{h.sector}}</td>
-                                <td><center>{{h.country}}</center></td>
-                                <td>{{h.manager}}</td>
-                                <td><center>
+                                <td class="col-md-1">{{h.ticker}}</td>
+                                <td class="col-md-3">{{h.company}}</td>
+                                <td class="col-md-2">{{h.sector}}</td>
+                                <td class="col-md-1">{{h.country}}</td>
+                                <td class="col-md-2">{{h.manager}}</td>
+                                <td class="col-md-1"><div id="spk_{{h.assetid}}" style="height:25px; width:110px;"></div></td>
+                                <td class="col-md-1"><center>
                                     {% if h.totalreturn > 0 %}
                                         <span class="text-success">{{h.totalreturn}}%</span>
                                     {% elif h.totalreturn < 0 %}
@@ -296,7 +303,7 @@
                                         {{h.totalreturn}}%
                                     {% endif %}
                                 </center></td>
-                                <td><center>{{h.yield}}%</center></td>
+                                <td class="col-md-1"><center>{{h.yield}}%</center></td>
                             </tr>
                         {% endfor %}
                       </tbody>
