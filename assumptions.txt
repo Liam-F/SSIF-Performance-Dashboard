@@ -12,3 +12,4 @@ Assumptions
 8. Return calculated on Current holdings is equal to Sum{Today's value} + Sum{Sell-off Value} / Sum{Total Cost} - 1.
 9. (8) implies all stocks use to be held count as no return
 10. Sparklines start at portfolio start date
+11. Portfolio rehauls need to have its record deleted or it won't be overwritten by generatePortfolioTimeSeries()
