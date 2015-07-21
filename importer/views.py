@@ -1,11 +1,12 @@
 import datetime as dt
 from django.shortcuts import render
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpRequest
 from django.template import RequestContext, loader
 from data.models import *
 from .models import *
 from os import remove
-from dashboard.views import frontierjson
+from os.path import isfile
+from dashboard.views import *
 
 def index(request):
     assetnames = ', '.join([a['name'] for a in Asset.objects.values('name')])
@@ -61,10 +62,39 @@ def eodupdate(request):
 
     # Update Dashboard Usages
     # Update Frontier
+    log.append('')
     log.append('Updating Frontier JSON file')
-    remove('frontier.json')
-    fjson = frontierjson(None)
+    if(isfile('frontier.json')):
+        remove('frontier.json')
+    json = frontierjson(None)
     log.append('Frontierjson() output: ')
-    log.append(fjson.content)
+    log.append(json.content)
+
+    # Update Portfolio TS
+    log.append('')
+    log.append('Updating Portfolio TS JSON file')
+    if(isfile('portfolio.json')):
+        remove('portfolio.json')
+    json = portfoliojson(None)
+    log.append('portfoliojson() output: ')
+    log.append(json.content)
+
+    # Update Portfolio Allocation
+    log.append('')
+    log.append('Updating Sector Allocation JSON file')
+    if(isfile('allocation.json')):
+        remove('allocation.json')
+    json = allocationjson(None)
+    log.append('allocationjson() output: ')
+    log.append(json.content)
+
+    # Update Portfolio Statistics
+    log.append('')
+    log.append('Updating Portfolio Statistics JSON file')
+    if(isfile('portfoliostats.json')):
+        remove('portfoliostats.json')
+    json = index(request = None)
+    log.append('allocationjson() output: ')
+    log.append(json)
 
     return HttpResponse('<br/>'.join(log))
