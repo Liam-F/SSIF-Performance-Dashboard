@@ -94,7 +94,6 @@ def portfolioindex():
     return output
 
 def index(request):
-    pdb.set_trace()
     if(isfile('portfoliostats.json')):
         with open('portfoliostats.json') as j:
             output = json.load(j)
@@ -259,7 +258,7 @@ def spkperformancejson(request):
         pr = AssetPrice.objects.filter(assetid__exact = a).order_by('-date')
         if not pr:
             return HttpResponse('nah')
-        pr = pr[0:5]
+        pr = pr[0:22:5]
         resp = []
         for p in pr:
             resp.append({'x': unix_time(p.date), 'y': p.price})
