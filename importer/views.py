@@ -62,6 +62,15 @@ def eodupdate(request):
     log.append('<br/>'.join(plog))
 
     # Update Dashboard Usages
+    # Update Portfolio Statistics
+    log.append('')
+    log.append('Updating Portfolio Statistics JSON file')
+    if(isfile('portfoliostats.json')):
+        remove('portfoliostats.json')
+    json = portfolioindex()
+    log.append('allocationjson() output: ')
+    log.append(str(JsonResponse(json,safe=False).content))
+
     # Update Frontier
     log.append('')
     log.append('Updating Frontier JSON file')
@@ -69,7 +78,7 @@ def eodupdate(request):
         remove('frontier.json')
     json = frontierjson(None)
     log.append('Frontierjson() output: ')
-    log.append(json.content)
+    log.append(str(json.content))
 
     # Update relative Frontier
     log.append('')
@@ -78,7 +87,7 @@ def eodupdate(request):
         remove('relativefrontier.json')
     json = relativefrontjson(None)
     log.append('relativefrontierjson() output: ')
-    log.append(json.content)
+    log.append(str(json.content))
 
     # Update Portfolio TS
     log.append('')
@@ -87,7 +96,7 @@ def eodupdate(request):
         remove('portfolio.json')
     json = portfoliojson(None)
     log.append('portfoliojson() output: ')
-    log.append(json.content)
+    log.append(str(json.content))
 
     # Update Portfolio Allocation
     log.append('')
@@ -96,15 +105,7 @@ def eodupdate(request):
         remove('allocation.json')
     json = allocationjson(None)
     log.append('allocationjson() output: ')
-    log.append(json.content)
+    log.append(str(json.content))
 
-    # Update Portfolio Statistics
-    log.append('')
-    log.append('Updating Portfolio Statistics JSON file')
-    if(isfile('portfoliostats.json')):
-        remove('portfoliostats.json')
-    json = index(request = None)
-    log.append('allocationjson() output: ')
-    log.append(json)
 
     return HttpResponse('<br/>'.join(log))

@@ -16,99 +16,99 @@ def unix_time(dte):
     delta = dte - epoch
     return delta.total_seconds() * 1000.0
 
+def portfolioindex():
+    # Calculate Portfolio Statistics
+    rf = 0.0 #LOL RATES
+    r_p = Portfolio().getReturns()
+    r = r_p['return']
+    er = np.mean(r)*252*100 # Mean Annualized Return from daily
+    sigma = (np.std(r)*np.sqrt(252))*100 # Annualized Standard Deviation
+    sharpe = (er-rf)/sigma
+
+    # Benchmark Calculations
+    # ASSUMPTION: Benchmark is hardcoded as 65% US SPX, 35% CN TSX
+    w = [0.65, 0.35]
+    benchmark = Asset.objects.filter(industry__exact = 'Index')
+    exr = Asset.objects.filter(name__exact = 'USDCAD')
+    # get returns according to available portfolio dates, merge is required to ensure dates are matched
+    # COLUMNS ARE: [DATE PORTFOLIO BENCHMARK US BENCHMARK CN USDCAD]
+    rmat = pd.merge(pd.DataFrame(benchmark[0].getReturns()), pd.DataFrame(benchmark[1].getReturns()), on='date') # Merge Benchmarks
+    rmat = pd.merge(pd.DataFrame(r_p), rmat, on='date') # Merge Portfolio Returns
+    rmat = pd.merge(rmat, pd.DataFrame(exr[0].getReturns()), on='date') # Merge Exchange Rates
+    rmat = rmat.iloc[:,1:] # Remove Date column
+    rmat.iloc[:,1] *= (1+rmat.iloc[:,-1]) # USDCAD
+    r_b = np.dot(rmat.iloc[:, [1,2]], w) # Calculate Benchmark
+    r = rmat.iloc[:, 0]
+    beta = np.cov(r,r_b)[0,1]/np.var(r_b) # Beta
+    alpha = (np.mean(r) - np.mean(r_b)*beta)*100*252
+    te = np.std(r-r_b)*100*np.sqrt(252)
+    ir = (er-rf)/te
+
+    # Holdings List:
+    holdings = []
+    assetids =[]
+    for a in Asset.objects.all():
+        assetValNow = a.calculateHoldingValue(ddate = dt.datetime.now())
+        if(assetValNow > 0):
+            # Get Total Return
+            # ASSUMPTION: Completely sold off assets are excluded
+            assetValCost = 0.0
+            for s in Transaction.objects.filter(assetid__exact = a):
+                cost = s.getCost()
+                if(cost < 0):
+                    assetValNow -= cost # it's negative cost so add it to the value now
+                else:
+                    assetValCost += cost
+
+            # Get Managers
+            m = SectorManager.objects.filter(assetid__exact = a)
+            if not m: m = 'None'
+            else: m = m[0].name
+
+            # Get Dividend Yield
+            divValue = a.aggregateDividends()
+            dyield = divValue / assetValNow
+
+            assetids.append(a.assetid) # For Sparklines
+            holdings.append({'assetid': a.assetid,
+                             'ticker': a.ticker,
+                             'company': a.name,
+                             'sector': a.industry,
+                             'country': a.country,
+                             'totalreturn': round((assetValNow/assetValCost - 1)*100, 1),
+                             'manager': m,
+                             'yield': round(dyield*100,1)})
+
+    # Template and output
+    output = {
+        'portfolioStartDate': dt.datetime.strftime(Portfolio.objects.all().order_by('date')[0].date, '%B %d, %Y'),
+        'avgRet': round(er, 2),
+        'vola': round(sigma, 2),
+        'sharpe': round(sharpe,2),
+        'alpha': round(alpha, 2),
+        'beta': round(beta,2),
+        'ir': round(ir,2),
+        'holdings': holdings,
+        'assetids': assetids
+    }
+    return output
+
 def index(request):
+    pdb.set_trace()
     if(isfile('portfoliostats.json')):
         with open('portfoliostats.json') as j:
             output = json.load(j)
     else:
-        # Calculate Portfolio Statistics
-        rf = 0.0 #LOL RATES
-        r_p = Portfolio().getReturns()
-        r = r_p['return']
-        er = np.mean(r)*252*100 # Mean Annualized Return from daily
-        sigma = (np.std(r)*np.sqrt(252))*100 # Annualized Standard Deviation
-        sharpe = (er-rf)/sigma
-
-        # Benchmark Calculations
-        # ASSUMPTION: Benchmark is hardcoded as 65% US SPX, 35% CN TSX
-        w = [0.65, 0.35]
-        benchmark = Asset.objects.filter(industry__exact = 'Index')
-        exr = Asset.objects.filter(name__exact = 'USDCAD')
-        # get returns according to available portfolio dates, merge is required to ensure dates are matched
-        # COLUMNS ARE: [DATE PORTFOLIO BENCHMARK US BENCHMARK CN USDCAD]
-        rmat = pd.merge(pd.DataFrame(benchmark[0].getReturns()), pd.DataFrame(benchmark[1].getReturns()), on='date') # Merge Benchmarks
-        rmat = pd.merge(pd.DataFrame(r_p), rmat, on='date') # Merge Portfolio Returns
-        rmat = pd.merge(rmat, pd.DataFrame(exr[0].getReturns()), on='date') # Merge Exchange Rates
-        rmat = rmat.iloc[:,1:] # Remove Date column
-        rmat.iloc[:,1] *= (1+rmat.iloc[:,-1]) # USDCAD
-        r_b = np.dot(rmat.iloc[:, [1,2]], w) # Calculate Benchmark
-        r = rmat.iloc[:, 0]
-        beta = np.cov(r,r_b)[0,1]/np.var(r_b) # Beta
-        alpha = (np.mean(r) - np.mean(r_b)*beta)*100*252
-        te = np.std(r-r_b)*100*np.sqrt(252)
-        ir = (er-rf)/te
-
-        # Holdings List:
-        holdings = []
-        assetids =[]
-        for a in Asset.objects.all():
-            assetValNow = a.calculateHoldingValue(ddate = dt.datetime.now())
-            if(assetValNow > 0):
-                # Get Total Return
-                # ASSUMPTION: Completely sold off assets are excluded
-                assetValCost = 0.0
-                for s in Transaction.objects.filter(assetid__exact = a):
-                    cost = s.getCost()
-                    if(cost < 0):
-                        assetValNow -= cost # it's negative cost so add it to the value now
-                    else:
-                        assetValCost += cost
-
-                # Get Managers
-                m = SectorManager.objects.filter(assetid__exact = a)
-                if not m: m = 'None'
-                else: m = m[0].name
-
-                # Get Dividend Yield
-                divValue = a.aggregateDividends()
-                dyield = divValue / assetValNow
-
-                assetids.append(a.assetid) # For Sparklines
-                holdings.append({'assetid': a.assetid,
-                                 'ticker': a.ticker,
-                                 'company': a.name,
-                                 'sector': a.industry,
-                                 'country': a.country,
-                                 'totalreturn': round((assetValNow/assetValCost - 1)*100, 1),
-                                 'manager': m,
-                                 'yield': round(dyield*100,1)})
-
-        # Template and output
-        output = {
-            'portfolioStartDate': dt.datetime.strftime(Portfolio.objects.all().order_by('date')[0].date, '%B %d, %Y'),
-            'avgRet': round(er, 2),
-            'vola': round(sigma, 2),
-            'sharpe': round(sharpe,2),
-            'alpha': round(alpha, 2),
-            'beta': round(beta,2),
-            'ir': round(ir,2),
-            'holdings': holdings,
-            'assetids': assetids
-        }
+        output = portfolioindex() # Exterrnal for eodupdate
 
         # Save as JSON
         with open('portfoliostats.json', 'w') as j:
             json.dump(output, j)
 
-    # If its a 'None' type request, we just return our output
-    # AKA, its the importer eod view calling...
-    if request is None:
-        return output
-    else:
-        template = loader.get_template('dashboard/index.html')
-        context = RequestContext(request, output)
+    template = loader.get_template('dashboard/index.html')
+    context = RequestContext(request, output)
 
-        return HttpResponse(template.render(context))
+    return HttpResponse(template.render(context))
 
 def portfoliojson(request):
     if(isfile('portfolio.json')):
