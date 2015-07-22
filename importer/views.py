@@ -7,6 +7,7 @@ from .models import *
 from os import remove
 from os.path import isfile
 from dashboard.views import *
+import pdb
 
 def index(request):
     assetnames = ', '.join([a['name'] for a in Asset.objects.values('name')])
@@ -68,6 +69,15 @@ def eodupdate(request):
         remove('frontier.json')
     json = frontierjson(None)
     log.append('Frontierjson() output: ')
+    log.append(json.content)
+
+    # Update relative Frontier
+    log.append('')
+    log.append('Updating Relative Frontier JSON file')
+    if(isfile('relativefrontier.json')):
+        remove('relativefrontier.json')
+    json = relativefrontjson(None)
+    log.append('relativefrontierjson() output: ')
     log.append(json.content)
 
     # Update Portfolio TS

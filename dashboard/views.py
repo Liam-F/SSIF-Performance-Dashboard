@@ -176,13 +176,14 @@ def frontierjson(request):
         r = r.iloc[:, 1:] # Remove date column
 
         # First calculate Min variance
+        #pdb.set_trace()
         n = len(r.columns)
-        covar = r.cov()
+        covar = np.cov(r, rowvar=0)
         er = r.mean(axis=0)
         cons = ({'type': 'eq', 'fun': lambda x: 1-sum(x)},{'type': 'ineq', 'fun': lambda x: x},)
-        wstar = optimize.minimize(lambda x, covar: np.sqrt(252*np.dot(x,np.dot(covar,x)))*100,
+        wstar = optimize.minimize(lambda x, covar: np.sqrt(252)*np.sqrt(np.dot(x,np.dot(covar,x)))*100,
                               x0=np.array([1.0/n]*n),#Initial guess of 1/N
-                              args=(covar), # Pass in arguments
+                              args=(covar,), # Pass in arguments
                               method='SLSQP', jac=False, #Jacobian vector
                               constraints=cons, # constraints set as above
                               options=({'maxiter': 1e5}))   #Ensure convergence
@@ -196,10 +197,10 @@ def frontierjson(request):
             vol += eps
             cons = ({'type': 'eq', 'fun': lambda x: 1-sum(x)},
                     {'type': 'ineq', 'fun': lambda x: x},
-                    {'type': 'eq', 'fun': lambda x,covar: vol - np.sqrt(252*np.dot(x,np.dot(covar,x)))*100, 'args': (covar,)})
+                    {'type': 'eq', 'fun': lambda x,covar: vol - np.sqrt(252)*np.sqrt(np.dot(x,np.dot(covar,x)))*100, 'args': (covar,)})
             wstar = optimize.minimize(lambda x, er: -np.dot(x,er),
                                       x0=np.array([1.0/n]*n),#Initial guess of 1/N
-                                      args=(er), # Pass in arguments
+                                      args=(er,), # Pass in arguments
                                       method='SLSQP', jac=False, #Jacobian vector
                                       constraints=cons, # constraints set as above
                                       options=({'maxiter': 1e5}))   #Ensure convergence
@@ -213,34 +214,42 @@ def frontierjson(request):
     return JsonResponse(r_r, safe=False)
 
 def relativefrontjson(request):
-    # Calculate Portfolio Statistics
-    rf = 0.0 #LOL RATES
-    r_p = Portfolio().getReturns()
-    sDate = r_p['date'][-1]
-    r = r_p['return']
-    er = np.mean(r)*252*100 # Mean Annualized Return from daily
-    sigma = (np.std(r)*np.sqrt(252))*100 # Annualized Standard Deviation
+    if(isfile('relativefrontier.json')):
+        with open('relativefrontier.json') as j:
+            r_r = json.load(j)
+    else:
+        # Calculate Portfolio Statistics
+        rf = 0.0 #LOL RATES
+        r_p = Portfolio().getReturns()
+        sDate = r_p['date'][-1]
+        r = r_p['return']
+        er = np.mean(r)*252*100 # Mean Annualized Return from daily
+        sigma = (np.std(r)*np.sqrt(252))*100 # Annualized Standard Deviation
 
-    # Calculate Benchmark Statistics
-    b = Asset.objects.filter(industry__exact = 'Index')
-    r_r = [{'x': sigma, 'y': er, 'name': 'SSIF'}]
-    r_ba = []
-    for bmark in b:
-        bp = bmark.getReturns(sDate = sDate, eDate = dt.datetime.now())
-        r_b = bp['return']
-        r_ba.append(pd.DataFrame(bp))
-        er = np.mean(r_b)*252*100 # Mean Annualized Return from daily
-        sigma = (np.std(r_b)*np.sqrt(252))*100 # Annualized Standard Deviation
-        r_r.append({'x': sigma, 'y': er, 'name': bmark.name})
+        # Calculate Benchmark Statistics
+        b = Asset.objects.filter(industry__exact = 'Index')
+        r_r = [{'x': sigma, 'y': er, 'name': 'SSIF'}]
+        r_ba = []
+        for bmark in b:
+            bp = bmark.getReturns(sDate = sDate, eDate = dt.datetime.now())
+            r_b = bp['return']
+            r_ba.append(pd.DataFrame(bp))
+            er = np.mean(r_b)*252*100 # Mean Annualized Return from daily
+            sigma = (np.std(r_b)*np.sqrt(252))*100 # Annualized Standard Deviation
+            r_r.append({'x': sigma, 'y': er, 'name': bmark.name})
 
-    # Calculate Combined Benchmark Statistics
-    # Assumption: 65% US and 35% CN like in main page, S&P 500 FIRST!
-    w = [0.65, 0.35]
-    r_ba = pd.DataFrame.merge(r_ba[0], r_ba[1], on='date').iloc[:,1:] # Strip the date
-    r_cb = np.dot(r_ba, w)
-    er = np.mean(r_cb)*252*100 # Mean Annualized Return from daily
-    sigma = (np.std(r_cb)*np.sqrt(252))*100 # Annualized Standard Deviation
-    r_r.append({'x': sigma, 'y': er, 'name': 'Combined Benchmark'})
+        # Calculate Combined Benchmark Statistics
+        # Assumption: 65% US and 35% CN like in main page, S&P 500 FIRST!
+        w = [0.65, 0.35]
+        r_ba = pd.DataFrame.merge(r_ba[0], r_ba[1], on='date').iloc[:,1:] # Strip the date
+        r_cb = np.dot(r_ba, w)
+        er = np.mean(r_cb)*252*100 # Mean Annualized Return from daily
+        sigma = (np.std(r_cb)*np.sqrt(252))*100 # Annualized Standard Deviation
+        r_r.append({'x': sigma, 'y': er, 'name': 'Combined Benchmark'})
+
+        # Save as JSON
+        with open('relativefrontier.json', 'w') as j:
+            json.dump(r_r, j)
 
     return JsonResponse(r_r, safe=False)
 
