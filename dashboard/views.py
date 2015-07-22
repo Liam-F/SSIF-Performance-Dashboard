@@ -16,7 +16,7 @@ def unix_time(dte):
     delta = dte - epoch
     return delta.total_seconds() * 1000.0
 
-def index(request):
+def portfolioindex():
     # Calculate Portfolio Statistics
     rf = 0.0 #LOL RATES
     r_p = Portfolio().getReturns()
@@ -80,8 +80,7 @@ def index(request):
                              'yield': round(dyield*100,1)})
 
     # Template and output
-    template = loader.get_template('dashboard/index.html')
-    context = RequestContext(request, {
+    output = {
         'portfolioStartDate': dt.datetime.strftime(Portfolio.objects.all().order_by('date')[0].date, '%B %d, %Y'),
         'avgRet': round(er, 2),
         'vola': round(sigma, 2),
@@ -91,41 +90,72 @@ def index(request):
         'ir': round(ir,2),
         'holdings': holdings,
         'assetids': assetids
-    })
+    }
+    return output
+
+def index(request):
+    if(isfile('portfoliostats.json')):
+        with open('portfoliostats.json') as j:
+            output = json.load(j)
+    else:
+        output = portfolioindex() # Exterrnal for eodupdate
+
+        # Save as JSON
+        with open('portfoliostats.json', 'w') as j:
+            json.dump(output, j)
+
+    template = loader.get_template('dashboard/index.html')
+    context = RequestContext(request, output)
 
     return HttpResponse(template.render(context))
 
 def portfoliojson(request):
-    # Template and output
-    p = list(Portfolio.objects.all().order_by('date').values('date', 'value', 'cash'))
+    if(isfile('portfolio.json')):
+        with open('portfolio.json') as j:
+            e = json.load(j)
+    else:
+        # Template and output
+        p = list(Portfolio.objects.all().order_by('date').values('date', 'value', 'cash'))
 
-    e = []
-    for i,dp in enumerate(p):
-        e.append([ unix_time(dp['date']), round(dp['value']+dp['cash'])])
+        e = []
+        for i,dp in enumerate(p):
+            e.append([ unix_time(dp['date']), round(dp['value']+dp['cash'])])
+
+        # Save as JSON
+        with open('portfolio.json', 'w') as j:
+            json.dump(e, j)
+
 
     return JsonResponse(e, safe=False)
 
 def allocationjson(request):
+    if(isfile('allocation.json')):
+        with open('allocation.json') as j:
+            temp = json.load(j)
+    else:
+        sectors = {'Information Technology': 0,
+                   'Financial': 0,
+                   'Energy':0,
+                   'Consumer Staples': 0,
+                   'Consumer Discretionary': 0,
+                   'Healthcare': 0,
+                   'Industrials': 0,
+                   'Utilities': 0,
+                   'Basic Materials': 0,
+                   'Telecom': 0}
 
-    sectors = {'Information Technology': 0,
-               'Financial': 0,
-               'Energy':0,
-               'Consumer Staples': 0,
-               'Consumer Discretionary': 0,
-               'Healthcare': 0,
-               'Industrials': 0,
-               'Utilities': 0,
-               'Basic Materials': 0,
-               'Telecom': 0}
+        p = Portfolio.objects.filter(date__lte = dt.datetime.now()).order_by('-date')[0].value
+        for a in Asset.objects.all():
+            if a.industry in sectors.keys():
+                sectors[a.industry] += a.calculateHoldingValue(ddate = dt.datetime.now())/p
 
-    p = Portfolio.objects.filter(date__lte = dt.datetime.now()).order_by('-date')[0].value
-    for a in Asset.objects.all():
-        if a.industry in sectors.keys():
-            sectors[a.industry] += a.calculateHoldingValue(ddate = dt.datetime.now())/p
+        temp = []
+        for s,per in sectors.items():
+            temp.append({'name': s, 'y': per})
 
-    temp = []
-    for s,per in sectors.items():
-        temp.append({'name': s, 'y': per})
+        # Save as JSON
+        with open('allocation.json', 'w') as j:
+            json.dump(temp, j)
 
     return JsonResponse(temp, safe=False)
 
@@ -133,7 +163,6 @@ def frontierjson(request):
     if(isfile('frontier.json')):
         with open('frontier.json') as j:
             r_r = json.load(j)
-            return JsonResponse(r_r, safe=False)
     else:
         exclusion_list = ['USDCAD=X', '^GSPTSE', '^GSPC', 'XLS'] #Excelis is missing data
 
@@ -146,13 +175,14 @@ def frontierjson(request):
         r = r.iloc[:, 1:] # Remove date column
 
         # First calculate Min variance
+        #pdb.set_trace()
         n = len(r.columns)
-        covar = r.cov()
+        covar = np.cov(r, rowvar=0)
         er = r.mean(axis=0)
         cons = ({'type': 'eq', 'fun': lambda x: 1-sum(x)},{'type': 'ineq', 'fun': lambda x: x},)
-        wstar = optimize.minimize(lambda x, covar: np.sqrt(252*np.dot(x,np.dot(covar,x)))*100,
+        wstar = optimize.minimize(lambda x, covar: np.sqrt(252)*np.sqrt(np.dot(x,np.dot(covar,x)))*100,
                               x0=np.array([1.0/n]*n),#Initial guess of 1/N
-                              args=(covar), # Pass in arguments
+                              args=(covar,), # Pass in arguments
                               method='SLSQP', jac=False, #Jacobian vector
                               constraints=cons, # constraints set as above
                               options=({'maxiter': 1e5}))   #Ensure convergence
@@ -166,10 +196,10 @@ def frontierjson(request):
             vol += eps
             cons = ({'type': 'eq', 'fun': lambda x: 1-sum(x)},
                     {'type': 'ineq', 'fun': lambda x: x},
-                    {'type': 'eq', 'fun': lambda x,covar: vol - np.sqrt(252*np.dot(x,np.dot(covar,x)))*100, 'args': (covar,)})
+                    {'type': 'eq', 'fun': lambda x,covar: vol - np.sqrt(252)*np.sqrt(np.dot(x,np.dot(covar,x)))*100, 'args': (covar,)})
             wstar = optimize.minimize(lambda x, er: -np.dot(x,er),
                                       x0=np.array([1.0/n]*n),#Initial guess of 1/N
-                                      args=(er), # Pass in arguments
+                                      args=(er,), # Pass in arguments
                                       method='SLSQP', jac=False, #Jacobian vector
                                       constraints=cons, # constraints set as above
                                       options=({'maxiter': 1e5}))   #Ensure convergence
@@ -183,34 +213,42 @@ def frontierjson(request):
     return JsonResponse(r_r, safe=False)
 
 def relativefrontjson(request):
-    # Calculate Portfolio Statistics
-    rf = 0.0 #LOL RATES
-    r_p = Portfolio().getReturns()
-    sDate = r_p['date'][-1]
-    r = r_p['return']
-    er = np.mean(r)*252*100 # Mean Annualized Return from daily
-    sigma = (np.std(r)*np.sqrt(252))*100 # Annualized Standard Deviation
+    if(isfile('relativefrontier.json')):
+        with open('relativefrontier.json') as j:
+            r_r = json.load(j)
+    else:
+        # Calculate Portfolio Statistics
+        rf = 0.0 #LOL RATES
+        r_p = Portfolio().getReturns()
+        sDate = r_p['date'][-1]
+        r = r_p['return']
+        er = np.mean(r)*252*100 # Mean Annualized Return from daily
+        sigma = (np.std(r)*np.sqrt(252))*100 # Annualized Standard Deviation
 
-    # Calculate Benchmark Statistics
-    b = Asset.objects.filter(industry__exact = 'Index')
-    r_r = [{'x': sigma, 'y': er, 'name': 'SSIF'}]
-    r_ba = []
-    for bmark in b:
-        bp = bmark.getReturns(sDate = sDate, eDate = dt.datetime.now())
-        r_b = bp['return']
-        r_ba.append(pd.DataFrame(bp))
-        er = np.mean(r_b)*252*100 # Mean Annualized Return from daily
-        sigma = (np.std(r_b)*np.sqrt(252))*100 # Annualized Standard Deviation
-        r_r.append({'x': sigma, 'y': er, 'name': bmark.name})
+        # Calculate Benchmark Statistics
+        b = Asset.objects.filter(industry__exact = 'Index')
+        r_r = [{'x': sigma, 'y': er, 'name': 'SSIF'}]
+        r_ba = []
+        for bmark in b:
+            bp = bmark.getReturns(sDate = sDate, eDate = dt.datetime.now())
+            r_b = bp['return']
+            r_ba.append(pd.DataFrame(bp))
+            er = np.mean(r_b)*252*100 # Mean Annualized Return from daily
+            sigma = (np.std(r_b)*np.sqrt(252))*100 # Annualized Standard Deviation
+            r_r.append({'x': sigma, 'y': er, 'name': bmark.name})
 
-    # Calculate Combined Benchmark Statistics
-    # Assumption: 65% US and 35% CN like in main page, S&P 500 FIRST!
-    w = [0.65, 0.35]
-    r_ba = pd.DataFrame.merge(r_ba[0], r_ba[1], on='date').iloc[:,1:] # Strip the date
-    r_cb = np.dot(r_ba, w)
-    er = np.mean(r_cb)*252*100 # Mean Annualized Return from daily
-    sigma = (np.std(r_cb)*np.sqrt(252))*100 # Annualized Standard Deviation
-    r_r.append({'x': sigma, 'y': er, 'name': 'Combined Benchmark'})
+        # Calculate Combined Benchmark Statistics
+        # Assumption: 65% US and 35% CN like in main page, S&P 500 FIRST!
+        w = [0.65, 0.35]
+        r_ba = pd.DataFrame.merge(r_ba[0], r_ba[1], on='date').iloc[:,1:] # Strip the date
+        r_cb = np.dot(r_ba, w)
+        er = np.mean(r_cb)*252*100 # Mean Annualized Return from daily
+        sigma = (np.std(r_cb)*np.sqrt(252))*100 # Annualized Standard Deviation
+        r_r.append({'x': sigma, 'y': er, 'name': 'Combined Benchmark'})
+
+        # Save as JSON
+        with open('relativefrontier.json', 'w') as j:
+            json.dump(r_r, j)
 
     return JsonResponse(r_r, safe=False)
 
@@ -220,7 +258,7 @@ def spkperformancejson(request):
         pr = AssetPrice.objects.filter(assetid__exact = a).order_by('-date')
         if not pr:
             return HttpResponse('nah')
-        pr = pr[0:5]
+        pr = pr[0:22:5]
         resp = []
         for p in pr:
             resp.append({'x': unix_time(p.date), 'y': p.price})

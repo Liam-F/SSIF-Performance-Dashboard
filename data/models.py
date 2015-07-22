@@ -80,6 +80,10 @@ class AssetPrice(models.Model):
     date = models.DateTimeField()
     price = models.FloatField()
 
+    def save(self, *args, **kwargs):
+        if(not AssetPrice.objects.filter(assetid__exact=self.assetid,date__exact = self.date).exists()):
+            super(AssetPrice, self).save(*args, **kwargs)
+
     def __str__(self):
         return 'Name: '+str(self.assetid.name)+' | Date: '+self.date.strftime('%Y-%m-%d')+' | '+str(self.price)
 
@@ -95,6 +99,10 @@ class AssetDividend(models.Model):
     assetid = models.ForeignKey(Asset, unique_for_date='date')
     date = models.DateTimeField()
     dps = models.FloatField()
+
+    def save(self, *args, **kwargs):
+        if(not AssetDividend.objects.filter(assetid__exact=self.assetid,date__exact = self.date).exists()):
+            super(AssetDividend, self).save(*args, **kwargs)
 
     def __str__(self):
         return 'Name: '+str(self.assetid.name)+' | Date: '+self.date.strftime('%Y-%m-%d')+' | DPS: '+str(self.dps)
@@ -127,13 +135,10 @@ class Portfolio(models.Model):
     cash = models.FloatField(unique_for_date='date') #Set default as initial Cash!!
 
     def calculatePortfolioValue(self, ddate):
-        # If portfolio exists on today, delete it
-        Portfolio.objects.filter(date__exact=ddate).delete()
-
         self.value = 0
 
         # Find Last period Portfolio and see if there's been transactions before
-        pminusone = Portfolio.objects.filter(date__lte=ddate).order_by('-date') # Get the most recent cash
+        pminusone = Portfolio.objects.filter(date__lt=ddate).order_by('-date') # Get the most recent cash
         if pminusone:
             self.cash = pminusone[0].cash
         # If theres no transactions before this date, then its just cash!
@@ -163,17 +168,23 @@ class Portfolio(models.Model):
         return self.value+self.cash
 
     def generatePortfolioTimeSeries(self, sDate=dt.datetime(2015,1,1), eDate=dt.datetime.now()):
+        log = []
         # GETS THE FIRST ASSET'S PRICE LENGTH (BAD ASSUMPTION FIX IF NEEDED) CURRENT STOCK = AAPL
         dates = [d['date'] for d in AssetPrice.objects.filter(assetid__exact=1, date__gte=sDate, date__lte=eDate).order_by('date').values('date')]
 
         # Get all Portfolio Value at those dates
         for d in dates:
             p = Portfolio(date=d, cash=self.cash, value=self.value)
+            # If portfolio exists on today, skip it
+            # Assumption, recreating portfolio series, you need to delete it
+            if (Portfolio.objects.filter(date__exact=d).exists()):
+                log.append('Portfolio Exists on this date -- '+d.strftime('%Y-%m-%d')+'. Will not be saved')
+                continue
             val = p.calculatePortfolioValue(d)
-            print('Saving Portfolio on '+d.strftime('%Y-%m-%d')+' Equity Value: $'+str(p.value)+' Cash: $'+str(p.cash)+' Portfolio Value: $'+str(val))
+            log.append('Saving Portfolio on '+d.strftime('%Y-%m-%d')+' Equity Value: $'+str(p.value)+' Cash: $'+str(p.cash)+' Portfolio Value: $'+str(val))
             p.save()
 
-        return 1
+        return log
 
     def __str__(self):
         return 'Portfolio on '+self.date.strftime('%Y-%m-%d')+' Equity Value: $'+str(self.value)+' Cash: $'+str(self.cash)
