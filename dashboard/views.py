@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import pdb
 from os.path import isfile
+from os import remove
 from scipy import optimize
 
 #since epoch milliseconds
@@ -60,11 +61,6 @@ def portfolioindex():
                 else:
                     assetValCost += cost
 
-            # Get Managers
-            m = SectorManager.objects.filter(assetid__exact = a)
-            if not m: m = 'None'
-            else: m = m[0].name
-
             # Get Dividend Yield
             divValue = a.aggregateDividends()
             dyield = divValue / assetValNow
@@ -76,7 +72,8 @@ def portfolioindex():
                              'sector': a.industry,
                              'country': a.country,
                              'totalreturn': round((assetValNow/assetValCost - 1)*100, 1),
-                             'manager': m,
+                             'manager': a.managerid.name,
+                             'managerid': a.managerid.managerid,
                              'yield': round(dyield*100,1)})
 
     # Template and output
@@ -94,6 +91,10 @@ def portfolioindex():
     return output
 
 def index(request):
+    if request.GET.get('a') == 'eod':
+      if(isfile('portfoliostats.json')):
+          remove('portfoliostats.json')
+
     if(isfile('portfoliostats.json')):
         with open('portfoliostats.json') as j:
             output = json.load(j)
@@ -110,6 +111,10 @@ def index(request):
     return HttpResponse(template.render(context))
 
 def portfoliojson(request):
+    if request.GET.get('a') == 'eod':
+      if(isfile('portfolio.json')):
+          remove('portfolio.json')
+
     if(isfile('portfolio.json')):
         with open('portfolio.json') as j:
             e = json.load(j)
@@ -129,6 +134,10 @@ def portfoliojson(request):
     return JsonResponse(e, safe=False)
 
 def allocationjson(request):
+    if request.GET.get('a') == 'eod':
+      if(isfile('allocation.json')):
+          remove('allocation.json')
+
     if(isfile('allocation.json')):
         with open('allocation.json') as j:
             temp = json.load(j)
@@ -160,6 +169,10 @@ def allocationjson(request):
     return JsonResponse(temp, safe=False)
 
 def frontierjson(request):
+    if request.GET.get('a') == 'eod':
+      if(isfile('frontier.json')):
+          remove('frontier.json')
+
     if(isfile('frontier.json')):
         with open('frontier.json') as j:
             r_r = json.load(j)
@@ -189,8 +202,8 @@ def frontierjson(request):
         r_r = [{'x': wstar.fun, 'y': np.dot(wstar.x, er)*252*100}]
 
         # Loop
-        eps = 0.35 # margin of increase in risk
-        iter = 25 # number of iterations
+        eps = 0.75 # margin of increase in risk
+        iter = 10 # number of iterations
         vol = wstar.fun
         for i in range(1,iter):
             vol += eps
@@ -213,6 +226,10 @@ def frontierjson(request):
     return JsonResponse(r_r, safe=False)
 
 def relativefrontjson(request):
+
+    if request.GET.get('a') == 'eod' and (isfile('relativefrontier.json')):
+        remove('relativefrontier.json')
+
     if(isfile('relativefrontier.json')):
         with open('relativefrontier.json') as j:
             r_r = json.load(j)
@@ -266,3 +283,17 @@ def spkperformancejson(request):
         return JsonResponse(resp, safe=False)
     else:
         return HttpResponse('nah')
+
+def managerinfo(request):
+    id = request.GET.get('a')
+    if id:
+        mgr = EquityManager.objects.filter(managerid__exact = id)
+        if not mgr:
+            return HttpResponse('<h2>Not Found</h2>')
+        else:
+            template = loader.get_template('dashboard/mgrinfo.html')
+            context = RequestContext(request, {'mgr': mgr[0]})
+
+            return HttpResponse(template.render(context))
+    else:
+        return HttpResponse('<h2>Not Found</h2>')

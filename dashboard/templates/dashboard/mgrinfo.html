@@ -1,0 +1,31 @@
+<div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+     <h4 class="modal-title deepblue">{{ mgr.name }}</h4>
+</div>
+<div class="modal-body">
+    <div class="container-fluid">
+        <div class="col-md-4" style="text-align:center;">
+            {% load staticfiles %}
+            {% with 'dashboard/upload/'|add:mgr.profile.name as image_static %}
+            <img class="mgrpic" src="{% static image_static %}" width="215" height="322"/>
+            {% endwith %}
+                <br/><br/>
+            <div>
+                {% if mgr.linkedin != 'NA' %}
+                    <a href="{{mgr.linkedin}}"><i class="fa fa-linkedin-square fa-2x"></i></a>
+                {% endif %}
+                {% if mgr.twitter != 'NA' %}
+                    &nbsp;&nbsp;<a href="https://twitter.com/{{mgr.twitter}}"><i class="fa fa-twitter fa-2x"></i></a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-8" style="text-align: justify;">
+            <b class="deepblue">Sector Manager: </b>{{mgr.sector}}
+            <br/><br/>
+            {{ mgr.desc }}
+        </div>
+    </div>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-default btn-info" data-dismiss="modal">Close</button>
+</div>

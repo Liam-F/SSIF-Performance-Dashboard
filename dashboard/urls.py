@@ -9,4 +9,5 @@ urlpatterns = [
     url(r'^relativefrontjson$', views.relativefrontjson, name='relfrontier'),
     url(r'^allocationjson$', views.allocationjson, name='allocation'),
     url(r'^spkperformancejson$', views.spkperformancejson, name='Sparkline Performance'),
+    url(r'^managerinfo$', views.managerinfo, name='Manager Info'),
 ]

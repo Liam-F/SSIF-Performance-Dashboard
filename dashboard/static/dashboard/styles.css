@@ -50,6 +50,10 @@ a:hover { color: #386898;}
     padding-right: 0px;
 }
 
+.mgrpic {
+  border: #e3e3e3 solid 5px;
+}
+
 .well{
     margin-top:15px;
     margin-bottom: 40px;

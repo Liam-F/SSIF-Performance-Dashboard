@@ -4,12 +4,27 @@ import csv
 import datetime as dt
 
 # Contain all Asset Descriptions and properties
+
+class EquityManager(models.Model):
+    managerid = models.AutoField(primary_key = True)
+    name = models.CharField(max_length=100)
+    sector = models.CharField(max_length = 50)
+    desc = models.CharField(max_length=2000)
+    linkedin = models.CharField(max_length=100)
+    twitter = models.CharField(max_length=100)
+    profile = models.ImageField(upload_to = 'managers/')
+
+    def __str__(self):
+        return self.name
+
+
 class Asset(models.Model):
     assetid = models.AutoField(primary_key=True)
     name = models.CharField(max_length=100, unique=True)
     ticker = models.CharField(max_length=10, unique=True)
     industry = models.CharField(max_length=100)
     country = models.CharField(max_length=50)
+    managerid = models.ForeignKey(EquityManager)
 
     def __str__(self):
         return str(self.assetid)+': '+self.name+' ('+self.ticker+') | Country: '+self.country+' | Industry: '+self.industry
@@ -86,14 +101,6 @@ class AssetPrice(models.Model):
 
     def __str__(self):
         return 'Name: '+str(self.assetid.name)+' | Date: '+self.date.strftime('%Y-%m-%d')+' | '+str(self.price)
-
-class SectorManager(models.Model):
-    managerid = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=100)
-    assetid = models.ForeignKey(Asset)
-
-    def __str__(self):
-        return 'Name: '+str(self.name)+' | Responsible for: '+self.assetid.ticker
 
 class AssetDividend(models.Model):
     assetid = models.ForeignKey(Asset, unique_for_date='date')

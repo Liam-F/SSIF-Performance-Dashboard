@@ -1,6 +1,6 @@
 import os; os.environ['DJANGO_SETTINGS_MODULE'] = 'ssif.settings'
 import importer.models as im
-import data.models as d
+from data.models import *
 import datetime as dt
 import csv
 
@@ -10,8 +10,8 @@ django.setup()
 #l = im.importDividends(dt.datetime(2014,1,1), dt.datetime(2015,7,1))
 #for ll in l: print(ll)
 #im.importTransactions('transactions-2015.csv')
-e = d.Portfolio(cash=776980)
-e.generatePortfolioTimeSeries(sDate = dt.datetime(2015,7,12))
+#e = d.Portfolio(cash=776980)
+#e.generatePortfolioTimeSeries(sDate = dt.datetime(2015,7,12))
 #e.exportPortfolioTimeSeries()
 
 
@@ -29,3 +29,8 @@ e.generatePortfolioTimeSeries(sDate = dt.datetime(2015,7,12))
 #    writer.writeheader()
 #    writer.writerow({'date': 'a', 'value': 'b'})
 #    writer.writerow({'date': 'a', 'value': 'b'})
+
+a = Asset.objects.filter(industry__exact = 'Basic Materials')
+for asset in a:
+     asset.managerid = EquityManager.objects.filter(name__exact = 'Chris Koutsikaloudis')[0]
+     asset.save()

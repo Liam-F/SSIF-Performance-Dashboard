@@ -108,6 +108,8 @@ STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'dashboard/static/'),
 )
 
+MEDIA_URL = 'dashboard/static/dashboard/upload/'
+
 # Simplified static file serving.
 # https://warehouse.python.org/project/whitenoise/
 
