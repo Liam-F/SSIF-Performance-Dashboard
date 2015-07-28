@@ -10,4 +10,5 @@ urlpatterns = [
     url(r'^allocationjson$', views.allocationjson, name='allocation'),
     url(r'^spkperformancejson$', views.spkperformancejson, name='Sparkline Performance'),
     url(r'^managerinfo$', views.managerinfo, name='Manager Info'),
+    url(r'^benchmarkjson$', views.benchmarkjson, name='Benchmark price series'),
 ]
