@@ -9,25 +9,26 @@ from os.path import isfile
 from dashboard.views import *
 import pdb
 
-def index(request):
-    assetnames = ', '.join([a['name'] for a in Asset.objects.values('name')])
-
-    # Template and output
-    template = loader.get_template('importer/index.html')
-    context = RequestContext(request, {'assetnames': assetnames})
-
-    return HttpResponse(template.render(context))
-
-def confirm(request):
-    startDate = dt.datetime(2015,1,1)
-    endDate = dt.datetime.now()
-    outputlog = importPrices(startDate, endDate)
-
-    # Template and output
-    template = loader.get_template('importer/index.html')
-    context = RequestContext(request, {'log': outputlog})
-
-    return HttpResponse(template.render(context))
+# Current deprecated to be imporved in the future when im not lazy
+# #def index(request):
+#     assetnames = ', '.join([a['name'] for a in Asset.objects.values('name')])
+#
+#     # Template and output
+#     template = loader.get_template('importer/index.html')
+#     context = RequestContext(request, {'assetnames': assetnames})
+#
+#     return HttpResponse(template.render(context))
+#
+# def confirm(request):
+#     startDate = dt.datetime(2015,1,1)
+#     endDate = dt.datetime.now()
+#     outputlog = importPrices(startDate, endDate)
+#
+#     # Template and output
+#     template = loader.get_template('importer/index.html')
+#     context = RequestContext(request, {'log': outputlog})
+#
+#     return HttpResponse(template.render(context))
 
 def eodupdate(request):
     # Update price for the past two days

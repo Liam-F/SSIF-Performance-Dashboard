@@ -25,7 +25,7 @@ SECRET_KEY = '0-n^d%_ocxt9tjz1*nrl@08apg!40^6vc8f9uv&z$uj9h#034d'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['ssif.kpei.me','vast-wave-2992.herokuapp.com', 'localhost']
 
 
 # Application definition

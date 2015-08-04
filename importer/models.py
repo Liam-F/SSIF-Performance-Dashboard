@@ -1,16 +1,19 @@
 from data.models import *
 import pandas as pd
-#import urllib.parse as parser
-import urllib as parser
+import urllib.parse as parser
+#import urllib as parser
 import datetime as dt
 import pdb
 
 #https://code.google.com/p/yahoo-finance-managed/wiki/csvHistQuotesDownload
-def importPrices(startDate, endDate):
-
-    exclusion_list = ['USDCAD=X', 'XLS']
+def importPrices(securities=None, startDate=dt.datetime(2013,1,1), endDate=dt.datetime.now()):
+    exclusion_list = ['USDCAD=X', 'XLS', 'CWT-UN.TO']
     log = []
-    alist = Asset.objects.all()
+    if securities is None:
+        alist = Asset.objects.all()
+    else:
+        alist = Asset.objects.filter(ticker__in = securities)
+
     log.append('Getting prices '+startDate.strftime('%d-%m-%Y')+' - '
                +endDate.strftime('%d-%m-%Y')+' for Asset List: ')
     log.append(', '.join([s.ticker for s in alist]))
@@ -27,22 +30,31 @@ def importPrices(startDate, endDate):
             'g': 'd' # Daily Data
         }
 
-        price = pd.read_csv('http://ichart.yahoo.com/table.csv?'+parser.urlencode(payload))
-        price = price[['Date','Adj Close']]
-        log.append('Importing '+str(len(price))+' Rows of Price Data for '+str(a.name))
-        for i,p in price.iterrows():
-            b = AssetPrice(assetid = a, date = dt.datetime.strptime(p['Date'], '%Y-%m-%d'), price = p['Adj Close'])
-            log.append('Saving - '+str(a.assetid)+' '+p['Date']+' : '+str(p['Adj Close']))
-            b.save()
-        log.append('')
+        try:
+            price = pd.read_csv('http://ichart.yahoo.com/table.csv?'+parser.urlencode(payload))
+            price = price[['Date','Adj Close']]
+            log.append('Importing '+str(len(price))+' Rows of Price Data for '+str(a.name))
+            for i,p in price.iterrows():
+                b = AssetPrice(assetid = a, date = dt.datetime.strptime(p['Date'], '%Y-%m-%d'), price = p['Adj Close'])
+                log.append('Saving - '+str(a.assetid)+' '+p['Date']+' : '+str(p['Adj Close']))
+                b.save()
+            log.append('')
+        except:
+            log.append('Error Grabbing Price...')
+            continue
 
     return log
 
-def importDividends(startDate, endDate):
+def importDividends(securities=None, startDate=dt.datetime(2013,1,1), endDate=dt.datetime.now()):
 
-    exclusion_list = ['USDCAD=X', 'XLS']
+    exclusion_list = ['USDCAD=X', 'XLS', 'CWT-UN.TO']
     log = []
-    alist = Asset.objects.all()
+
+    if securities is None:
+        alist = Asset.objects.all()
+    else:
+        alist = Asset.objects.filter(ticker__in = securities)
+
     log.append('Getting Dividends '+startDate.strftime('%d-%m-%Y')+' - '
                +endDate.strftime('%d-%m-%Y')+' for Asset List: ')
     log.append(', '.join([s.ticker for s in alist]))
@@ -60,14 +72,18 @@ def importDividends(startDate, endDate):
             'g': 'v' # dividends
         }
 
-        dividends = pd.read_csv('http://ichart.yahoo.com/table.csv?'+parser.urlencode(payload))
-        dividends = dividends[['Date','Dividends']]
-        log.append('Importing '+str(len(dividends))+' Rows of Dividend Data for '+str(a.name))
-        for i,d in dividends.iterrows():
-            b = AssetDividend(assetid = a, date = dt.datetime.strptime(d['Date'], '%Y-%m-%d'), dps = d['Dividends'])
-            log.append('Saving - '+str(a.assetid)+' '+d['Date']+' : '+str(d['Dividends']))
-            b.save()
-        log.append('')
+        try:
+            dividends = pd.read_csv('http://ichart.yahoo.com/table.csv?'+parser.urlencode(payload))
+            dividends = dividends[['Date','Dividends']]
+            log.append('Importing '+str(len(dividends))+' Rows of Dividend Data for '+str(a.name))
+            for i,d in dividends.iterrows():
+                b = AssetDividend(assetid = a, date = dt.datetime.strptime(d['Date'], '%Y-%m-%d'), dps = d['Dividends'])
+                log.append('Saving - '+str(a.assetid)+' '+d['Date']+' : '+str(d['Dividends']))
+                b.save()
+            log.append('')
+        except:
+            log.append('Error Grabbing Dividend...')
+            continue
 
     return log
 

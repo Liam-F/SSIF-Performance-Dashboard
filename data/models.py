@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Sum
 import csv
+import pandas as pd
 import datetime as dt
 
 # Contain all Asset Descriptions and properties
@@ -60,23 +61,28 @@ class Asset(models.Model):
         else:
             return p[0].price
 
-    def getReturns(self, sDate = None, eDate = None):
+    def getReturns(self, sDate = None, eDate = None, over = 1):
         if sDate is None:
             sDate = AssetPrice.objects.filter(assetid__exact = self.assetid).order_by('date')[0].date
         if eDate is None:
-            eDate = AssetPrice.objects.filter(assetid__exact = self.assetid).order_by('-date')[0].date
+            eDate = dt.datetime.now()
 
-        p = AssetPrice.objects.filter(assetid__exact = self.assetid, date__gte = sDate, date__lte = eDate).order_by('-date')
-        exr = AssetPrice.objects.filter(assetid__exact = Asset.objects.filter(name__exact='USDCAD')[0], date__gte = sDate, date__lte = eDate).order_by('-date')
-        r = []
-        dates = []
-        for i in range(0,len(p)-1):
-            rate_t = exr.filter(date__lte = p[i].date)[0].price
-            rate_t1 = exr.filter(date__lte = p[i+1].date)[0].price
-            r.append((p[i].price*rate_t)/(p[i+1].price*rate_t1) -1)
-            dates.append(p[i+1].date) # Return = % Change as of Yesterday close to Today's close
+        p = pd.DataFrame(list(AssetPrice.objects.filter(assetid__exact = self.assetid,
+                                                        date__gte = sDate,date__lte = eDate).order_by('date').values('date','price')))
+        dates = p['date']
 
-        return { 'date': dates, 'return': r}
+        if self.country == 'US':
+            exr =  pd.DataFrame(list(AssetPrice.objects.filter(assetid__exact = Asset.objects.filter(name__exact='USDCAD')[0],
+                                                            date__gte = sDate, date__lte = eDate).order_by('date').values('date','price')))
+            p = p.merge(exr, on='date')
+            p = p['price_x']*p['price_y'] # Price * exchange rate
+        else:
+            p = p['price']
+
+        p.index = dates
+        r = (p/p.shift(1)-1)[over::over] # Get Return
+
+        return r
 
     def getExchangeRate(self, ddate):
         # get the current exchange rate as of this date OR next available date
@@ -165,12 +171,11 @@ class Portfolio(models.Model):
             self.cash += aggTrans*d[0].dps*exc
 
            # Reconcile Cash
-           # Asset Price as of the transaction date OR later if no price data is available
-           p = a.getAssetPrice(ddate)
-
            # ASSUMPTION: Transactions must be made on a valid trading date or cash will not be deducted
+           #             A Ten Dollar Fee in $CAD is applied per trade
            for tr in Transaction.objects.filter(date__exact = ddate, assetid__exact = a.assetid):
-               self.cash -= tr.shares*p*exc # Subtracted because negative shares = increase in cash and vice versa
+               self.cash -= tr.getCost() # Subtracted because negative shares = increase in cash and vice versa
+               self.cash -= 10.00 # Fee
 
         return self.value+self.cash
 
@@ -207,18 +212,17 @@ class Portfolio(models.Model):
     def getPortfolioValue(self):
         return self.value+self.cash
 
-    def getReturns(self, sDate = None, eDate = None):
+    def getReturns(self, sDate = None, eDate = None, over = 1):
         if sDate is None:
             sDate = Portfolio.objects.all().order_by('date')[0].date
         if eDate is None:
             eDate = Portfolio.objects.all().order_by('-date')[0].date
 
-        p = Portfolio.objects.filter(date__gte = sDate, date__lte = eDate).order_by('-date')
-        r = []
-        dates = []
-        for i in range(0,len(p)-1):
-            r.append((p[i].getPortfolioValue())/(p[i+1].getPortfolioValue()) -1)
-            dates.append(p[i+1].date)
-        return {'date': dates, 'return': r}
+        p = pd.DataFrame(list(Portfolio.objects.filter(date__gte = sDate, date__lte = eDate).order_by('date').values('date','value','cash')))
+        pv = p['value']+p['cash']
+        pv.index = p['date']
+        pv = (pv/pv.shift(over)-1)[over::over]
+
+        return pv
 
 

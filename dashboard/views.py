@@ -11,6 +11,8 @@ from os.path import isfile
 from os import remove
 from scipy import optimize
 
+import time
+
 #since epoch milliseconds
 def unix_time(dte):
     epoch = dt.datetime.utcfromtimestamp(0)
@@ -20,29 +22,26 @@ def unix_time(dte):
 def portfolioindex():
     # Calculate Portfolio Statistics
     rf = 0.0 #LOL RATES
-    r_p = Portfolio().getReturns()
-    r = r_p['return']
-    er = np.mean(r)*252*100 # Mean Annualized Return from daily
-    sigma = (np.std(r)*np.sqrt(252))*100 # Annualized Standard Deviation
+    per = 252
+    sDate = Portfolio.objects.all().order_by('date')[0].date # get the starting date of the portfolio
+    r_p = Portfolio().getReturns(sDate =sDate, over=1)
+    er = np.mean(r_p)*per*100 # Mean Annualized Return from per
+    sigma = (np.std(r_p)*np.sqrt(per))*100 # Annualized Standard Deviation
     sharpe = (er-rf)/sigma
 
     # Benchmark Calculations
     # ASSUMPTION: Benchmark is hardcoded as 65% US SPX, 35% CN TSX
     w = [0.65, 0.35]
-    benchmark = Asset.objects.filter(industry__exact = 'Index')
-    exr = Asset.objects.filter(name__exact = 'USDCAD')
-    # get returns according to available portfolio dates, merge is required to ensure dates are matched
-    # COLUMNS ARE: [DATE PORTFOLIO BENCHMARK US BENCHMARK CN USDCAD]
-    rmat = pd.merge(pd.DataFrame(benchmark[0].getReturns()), pd.DataFrame(benchmark[1].getReturns()), on='date') # Merge Benchmarks
-    rmat = pd.merge(pd.DataFrame(r_p), rmat, on='date') # Merge Portfolio Returns
-    rmat = pd.merge(rmat, pd.DataFrame(exr[0].getReturns()), on='date') # Merge Exchange Rates
-    rmat = rmat.iloc[:,1:] # Remove Date column
-    rmat.iloc[:,1] *= (1+rmat.iloc[:,-1]) # USDCAD
-    r_b = np.dot(rmat.iloc[:, [1,2]], w) # Calculate Benchmark
-    r = rmat.iloc[:, 0]
-    beta = np.cov(r,r_b)[0,1]/np.var(r_b) # Beta
-    alpha = (np.mean(r) - np.mean(r_b)*beta)*100*252
-    te = np.std(r-r_b)*100*np.sqrt(252)
+    us_b = Asset.objects.filter(country__exact = 'US', industry__exact = 'Index').first().getReturns(sDate = sDate, over =1)
+    cn_b = Asset.objects.filter(country__exact = 'CN', industry__exact = 'Index').first().getReturns(sDate = sDate, over =1)
+
+    rmat = np.matrix(pd.concat([r_p, us_b, cn_b], axis=1).dropna(axis=0)) # Ignore dates, Canadian bench is fucked
+    r_b = np.dot(rmat[:, 1:], w) # Calculate Benchmark
+    r_p = np.squeeze(np.asarray(rmat[:,0]))
+
+    beta = np.cov(r_p,r_b)[0,1]/np.var(r_b) # Beta
+    alpha = (np.mean(r_p) - np.mean(r_b)*beta)*100*per
+    te = np.std(r_p-r_b)*100*np.sqrt(per)
     ir = (er-rf)/te
 
     # Holdings List:
@@ -79,6 +78,8 @@ def portfolioindex():
     # Template and output
     output = {
         'portfolioStartDate': dt.datetime.strftime(Portfolio.objects.all().order_by('date')[0].date, '%B %d, %Y'),
+        'frontierStartDate': dt.datetime.strftime(dt.datetime.now()-dt.timedelta(days=365), '%B %d, %Y'),
+        'today': dt.datetime.strftime(dt.datetime.now(), '%B %d, %Y'),
         'avgRet': round(er, 2),
         'vola': round(sigma, 2),
         'sharpe': round(sharpe,2),
@@ -133,6 +134,41 @@ def portfoliojson(request):
 
     return JsonResponse(e, safe=False)
 
+def benchmarkjson(request):
+    if request.GET.get('a') == 'eod':
+      if(isfile('benchmark.json')):
+          remove('benchmark.json')
+
+    if(isfile('benchmark.json')):
+        with open('benchmark.json') as j:
+            e = json.load(j)
+    else:
+        first = Portfolio.objects.all().order_by('date').first()
+        sDate = first.date
+        s_o = first.value + first.cash
+        # Benchmark Calculations
+        # ASSUMPTION: Benchmark is hardcoded as 65% US SPX, 35% CN TSX
+        w = [0.65, 0.35]
+        us_b = Asset.objects.filter(country__exact = 'US', industry__exact = 'Index').first().getReturns(sDate = sDate)
+        cn_b = Asset.objects.filter(country__exact = 'CN', industry__exact = 'Index').first().getReturns(sDate = sDate)
+        rmat = pd.concat([us_b, cn_b], axis=1).dropna(axis=0)# Concat us and CN first
+        r_b =  pd.DataFrame(np.dot(rmat, w), index=rmat.index) # Get Benchmark return first the
+
+        port = pd.DataFrame(Portfolio().getReturns(sDate = sDate)) # Then get portfolio dates/returns
+        r_b = port.join(r_b, how='left', lsuffix='p', rsuffix='b') # Do a LEFT join on portfolio date
+        r_b = r_b['0b'].fillna(0) # Then fill NaNs with zeros, this ensures equal length
+        ts = np.cumprod(r_b+1)*s_o
+
+        e = [[unix_time(i),round(p)] for (i,p) in ts.iteritems()]
+
+        # Save as JSON
+        with open('benchmark.json', 'w') as j:
+            json.dump(e, j)
+
+
+    return JsonResponse(e, safe=False)
+
+
 def allocationjson(request):
     if request.GET.get('a') == 'eod':
       if(isfile('allocation.json')):
@@ -179,16 +215,17 @@ def frontierjson(request):
     else:
         exclusion_list = ['USDCAD=X', '^GSPTSE', '^GSPC', 'XLS'] #Excelis is missing data
 
+        lookback = dt.timedelta(days = 365)
+        now = dt.datetime.now()
+        sDate = now - lookback
         # Markowitz Frontier
-        sDate = Portfolio.objects.all().order_by('date')[0].date # Get first date of Portfolio
-        r = pd.DataFrame(Asset.objects.all().first().getReturns(sDate = sDate, eDate = dt.datetime.now())) # get the first asset to start it
+        r = []
         for a in Asset.objects.all()[1:]:
-            if a.ticker not in exclusion_list:
-                r = r.merge(pd.DataFrame(a.getReturns(sDate = sDate, eDate = dt.datetime.now())), on='date')
-        r = r.iloc[:, 1:] # Remove date column
+            if a.ticker not in exclusion_list or a.calculateHoldingValue(ddate = now) > 0:
+                r.append(pd.DataFrame(a.getReturns(sDate = sDate, eDate = now)))
 
+        r = pd.concat(r, axis=1).dropna(axis=0)
         # First calculate Min variance
-        #pdb.set_trace()
         n = len(r.columns)
         covar = np.cov(r, rowvar=0)
         er = r.mean(axis=0)
@@ -200,10 +237,9 @@ def frontierjson(request):
                               constraints=cons, # constraints set as above
                               options=({'maxiter': 1e5}))   #Ensure convergence
         r_r = [{'x': wstar.fun, 'y': np.dot(wstar.x, er)*252*100}]
-
         # Loop
-        eps = 0.75 # margin of increase in risk
-        iter = 10 # number of iterations
+        eps = 0.35 # margin of increase in risk
+        iter = 25 # number of iterations
         vol = wstar.fun
         for i in range(1,iter):
             vol += eps
@@ -236,11 +272,12 @@ def relativefrontjson(request):
     else:
         # Calculate Portfolio Statistics
         rf = 0.0 #LOL RATES
-        r_p = Portfolio().getReturns()
-        sDate = r_p['date'][-1]
-        r = r_p['return']
-        er = np.mean(r)*252*100 # Mean Annualized Return from daily
-        sigma = (np.std(r)*np.sqrt(252))*100 # Annualized Standard Deviation
+        lookback = dt.timedelta(days = 365)
+        now = dt.datetime.now()
+        sDate = now - lookback
+        r_p = Portfolio().getReturns(sDate = sDate, eDate = dt.datetime.now())
+        er = np.mean(r_p)*252*100 # Mean Annualized Return from daily
+        sigma = (np.std(r_p)*np.sqrt(252))*100 # Annualized Standard Deviation
 
         # Calculate Benchmark Statistics
         b = Asset.objects.filter(industry__exact = 'Index')
@@ -248,16 +285,15 @@ def relativefrontjson(request):
         r_ba = []
         for bmark in b:
             bp = bmark.getReturns(sDate = sDate, eDate = dt.datetime.now())
-            r_b = bp['return']
-            r_ba.append(pd.DataFrame(bp))
-            er = np.mean(r_b)*252*100 # Mean Annualized Return from daily
-            sigma = (np.std(r_b)*np.sqrt(252))*100 # Annualized Standard Deviation
+            r_ba.append(pd.DataFrame(bp)) # Used later in combined benchmark
+            er = np.mean(bp)*252*100 # Mean Annualized Return from daily
+            sigma = (np.std(bp)*np.sqrt(252))*100 # Annualized Standard Deviation
             r_r.append({'x': sigma, 'y': er, 'name': bmark.name})
 
         # Calculate Combined Benchmark Statistics
         # Assumption: 65% US and 35% CN like in main page, S&P 500 FIRST!
         w = [0.65, 0.35]
-        r_ba = pd.DataFrame.merge(r_ba[0], r_ba[1], on='date').iloc[:,1:] # Strip the date
+        r_ba = pd.DataFrame.merge(r_ba[0], r_ba[1], left_index = True, right_index = True) # Strip the date
         r_cb = np.dot(r_ba, w)
         er = np.mean(r_cb)*252*100 # Mean Annualized Return from daily
         sigma = (np.std(r_cb)*np.sqrt(252))*100 # Annualized Standard Deviation

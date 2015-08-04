@@ -12,11 +12,11 @@
 }
 
 .deepblue{
-    color: #386898 !important;
+    color: #0033bb !important;
 }
 
 .lightblue {
-    color: #96C0E6;
+    color: #4499ff;
 }
 
 .overview{
@@ -35,11 +35,15 @@ h3{
     margin: 0;
 }
 
-a { color: #96C0E6; }
-a:hover { color: #386898;}
+a { color: #4499ff; }
+a:hover { color: #0033bb;}
 
 .zeropad{
    padding:0;
+}
+
+.detail-label {
+    float: right;
 }
 
 .zero-left-pad {
