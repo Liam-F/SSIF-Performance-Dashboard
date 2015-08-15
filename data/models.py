@@ -69,17 +69,19 @@ class Asset(models.Model):
 
         p = pd.DataFrame(list(AssetPrice.objects.filter(assetid__exact = self.assetid,
                                                         date__gte = sDate,date__lte = eDate).order_by('date').values('date','price')))
-        dates = p['date']
 
         if self.country == 'US':
             exr =  pd.DataFrame(list(AssetPrice.objects.filter(assetid__exact = Asset.objects.filter(name__exact='USDCAD')[0],
                                                             date__gte = sDate, date__lte = eDate).order_by('date').values('date','price')))
             p = p.merge(exr, on='date')
+            dates = p['date']
             p = p['price_x']*p['price_y'] # Price * exchange rate
         else:
+            dates = p['date']
             p = p['price']
 
         p.index = dates
+        p.name = 'price'
         r = (p/p.shift(1)-1)[over::over] # Get Return
 
         return r

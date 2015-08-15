@@ -1,7 +1,6 @@
 from data.models import *
 import pandas as pd
-import urllib.parse as parser
-#import urllib as parser
+import urllib as parser
 import datetime as dt
 import pdb
 

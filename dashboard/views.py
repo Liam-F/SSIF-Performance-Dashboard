@@ -224,7 +224,7 @@ def frontierjson(request):
             if a.ticker not in exclusion_list or a.calculateHoldingValue(ddate = now) > 0:
                 r.append(pd.DataFrame(a.getReturns(sDate = sDate, eDate = now)))
 
-        r = pd.concat(r, axis=1).dropna(axis=0)
+        r = pd.concat(r, axis=1, join='inner').dropna(axis=0)
         # First calculate Min variance
         n = len(r.columns)
         covar = np.cov(r, rowvar=0)
