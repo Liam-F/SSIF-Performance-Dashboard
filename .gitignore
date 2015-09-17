@@ -18,6 +18,7 @@ $RECYCLE.BIN/
 *.pyc
 *.json
 staticfiles
+cron.py
 
 # =========================
 # Operating System Files
@@ -31,8 +32,7 @@ staticfiles
 .LSOverride
 
 # Icon must ends with two \r.
-Icon
-
+Icon
 # Thumbnails
 ._*
 

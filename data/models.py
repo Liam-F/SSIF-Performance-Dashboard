@@ -127,12 +127,16 @@ class Transaction(models.Model):
     date = models.DateTimeField()
     shares = models.FloatField()
     assetid = models.ForeignKey(Asset)
+    noncash = models.BooleanField(default=False)
 
     def getCost(self):
-        return (AssetPrice.objects.filter(date__lte = self.date, assetid__exact = self.assetid).order_by('-date')[0].price # Price that date or earlier
-                * self.shares # Number of shares
-                * self.assetid.getExchangeRate(ddate = self.date) # Account for Exchange rates (To CAD)
-                )
+        if self.noncash:
+            return 0
+        else:
+            return (AssetPrice.objects.filter(date__lte = self.date, assetid__exact = self.assetid).order_by('-date')[0].price # Price that date or earlier
+                    * self.shares # Number of shares
+                    * self.assetid.getExchangeRate(ddate = self.date) # Account for Exchange rates (To CAD)
+                    )
 
     def __str__(self):
         if(self.shares > 0):
@@ -141,7 +145,7 @@ class Transaction(models.Model):
             otype = 'SELL'
         else:
             return 'NO ACTION'
-        return otype+' '+str(self.shares)+' of '+self.assetid.name+' ('+self.assetid.ticker+') on close of '+self.date.strftime('%Y-%m-%d')
+        return otype+' (NC: '+str(self.noncash)+') '+str(self.shares)+' of '+self.assetid.name+' ('+self.assetid.ticker+') on close of '+self.date.strftime('%Y-%m-%d')
 
 class Portfolio(models.Model):
     portfolioid = models.AutoField(primary_key=True)
@@ -177,7 +181,8 @@ class Portfolio(models.Model):
            #             A Ten Dollar Fee in $CAD is applied per trade
            for tr in Transaction.objects.filter(date__exact = ddate, assetid__exact = a.assetid):
                self.cash -= tr.getCost() # Subtracted because negative shares = increase in cash and vice versa
-               self.cash -= 10.00 # Fee
+               if tr.noncash == False:
+                self.cash -= 10.00 # Fee
 
         return self.value+self.cash
 

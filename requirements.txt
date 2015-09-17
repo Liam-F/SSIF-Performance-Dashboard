@@ -3,5 +3,6 @@ gunicorn==19.3.0
 whitenoise==1.0.6
 numpy==1.8.1
 pandas==0.16.2
-scipy==0.14.0
 Pillow==2.9.0
+scipy==0.14.0
+pyfolio

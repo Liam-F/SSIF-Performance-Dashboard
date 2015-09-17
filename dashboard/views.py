@@ -10,6 +10,7 @@ import pdb
 from os.path import isfile
 from os import remove
 from scipy import optimize
+#from pyfolio.bayesian import run_model, compute_bayes_cone
 
 import time
 
@@ -110,6 +111,47 @@ def index(request):
     context = RequestContext(request, output)
 
     return HttpResponse(template.render(context))
+
+def forecastjson(request):
+    if request.GET.get('a') == 'eod':
+      if(isfile('forecast.json')):
+          remove('forecast.json')
+
+    if(isfile('forecast.json')):
+        with open('forecast.json') as j:
+            e = json.load(j)
+    else:
+
+        lookback = dt.timedelta(days = 365)
+        now = dt.date.today()
+        ret = Portfolio.objects.first().getReturns(sDate=now-lookback)
+        t_forecast = pd.date_range(now, periods=22, freq='B')
+        trace = run_model('t', ret, pd.Series([0]*len(t_forecast), index=t_forecast), samples=500)
+
+        # Compute bayes cone
+        forecast = compute_bayes_cone(trace['returns_missing'])
+        pv = Portfolio.objects.order_by('date').last().getPortfolioValue()
+
+        # Format cones
+        e = []
+        # inner level
+        #Prepend initial value of 1 to match date
+        forecast.get(5).insert(0,1); forecast.get(25).insert(0,1); forecast.get(75).insert(0,1); forecast.get(95).insert(0,1);
+        forecast_mat = pv*pd.DataFrame([forecast.get(25), forecast.get(75)], columns = [unix_time(t) for t in t_forecast]).T
+
+        forecast_mat.reset_index(inplace=True)
+        e.append(forecast_mat.values.tolist())
+
+        # outer level
+        forecast_mat[0] = np.array(forecast.get(5))*pv
+        forecast_mat[1] = np.array(forecast.get(95))*pv
+        e.append(forecast_mat.values.tolist())
+
+        # Save as JSON
+        with open('forecast.json', 'w') as j:
+            json.dump(e, j)
+
+    return JsonResponse(e, safe=False)
 
 def portfoliojson(request):
     if request.GET.get('a') == 'eod':
